@@ -1,6 +1,5 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../db');
-const Consumable = require('./Consumable');
 
 const ConsumableLog = sequelize.define('ConsumableLog', {
   id: {
@@ -78,6 +77,16 @@ const ConsumableLog = sequelize.define('ConsumableLog', {
     type: DataTypes.STRING,
     allowNull: true,
     comment: '修改原因'
+  },
+  isConsumableDeleted: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+    comment: '关联耗材是否已被删除'
+  },
+  consumableSnapshot: {
+    type: DataTypes.JSON,
+    allowNull: true,
+    comment: '耗材快照信息（分类、单位、供应商等），用于耗材删除后追溯'
   }
 }, {
   tableName: 'consumable_logs',
@@ -89,13 +98,9 @@ const ConsumableLog = sequelize.define('ConsumableLog', {
     { fields: ['createdAt'] },
     { fields: ['consumableId', 'createdAt'] },
     { fields: ['originalLogId'] },
-    { fields: ['isEditable'] }
+    { fields: ['isEditable'] },
+    { fields: ['isConsumableDeleted'] }
   ]
-});
-
-ConsumableLog.belongsTo(Consumable, {
-  foreignKey: 'consumableId',
-  onDelete: 'CASCADE'
 });
 
 module.exports = ConsumableLog;

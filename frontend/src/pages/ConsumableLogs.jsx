@@ -121,13 +121,39 @@ function ConsumableLogs() {
       dataIndex: 'consumableId',
       key: 'consumableId',
       width: 150,
-      render: value => <code>{value}</code>,
+      render: (value, record) => (
+        <Space>
+          <code>{value}</code>
+          {record.isConsumableDeleted && (
+            <Tooltip title="该耗材已被删除">
+              <Tag color="red">已删除</Tag>
+            </Tooltip>
+          )}
+        </Space>
+      ),
     },
     {
       title: '耗材名称',
       dataIndex: 'consumableName',
       key: 'consumableName',
       width: 150,
+      render: (value, record) => (
+        <Tooltip
+          title={
+            record.consumableSnapshot ? (
+              <div>
+                <div>分类: {record.consumableSnapshot.category || '-'}</div>
+                <div>单位: {record.consumableSnapshot.unit || '-'}</div>
+                <div>单价: {record.consumableSnapshot.unitPrice || '-'}</div>
+                <div>供应商: {record.consumableSnapshot.supplier || '-'}</div>
+                <div>位置: {record.consumableSnapshot.location || '-'}</div>
+              </div>
+            ) : null
+          }
+        >
+          <span>{value}</span>
+        </Tooltip>
+      ),
     },
     {
       title: '操作类型',
@@ -277,6 +303,10 @@ function ConsumableLogs() {
         操作人: log.operator,
         原因: log.reason || '',
         备注: log.notes || '',
+        耗材状态: log.isConsumableDeleted ? '已删除' : '正常',
+        分类: log.consumableSnapshot?.category || '',
+        单位: log.consumableSnapshot?.unit || '',
+        单价: log.consumableSnapshot?.unitPrice || '',
       }));
 
       const ws = XLSX.utils.json_to_sheet(exportData);
@@ -646,6 +676,7 @@ function ConsumableLogs() {
                 <div style={{ fontSize: 12, color: '#666' }}>
                   <p>
                     <strong>耗材:</strong> {item.consumableName} ({item.consumableId})
+                    {item.isConsumableDeleted && <Tag color="red" style={{ marginLeft: 8 }}>已删除</Tag>}
                   </p>
                   <p>
                     <strong>操作人:</strong> {item.operator}
@@ -658,6 +689,13 @@ function ConsumableLogs() {
                   {item.notes && (
                     <p>
                       <strong>备注:</strong> {item.notes}
+                    </p>
+                  )}
+                  {item.consumableSnapshot && (
+                    <p>
+                      <strong>快照信息:</strong> 分类:{item.consumableSnapshot.category || '-'} | 
+                      单位:{item.consumableSnapshot.unit || '-'} | 
+                      单价:{item.consumableSnapshot.unitPrice || '-'}
                     </p>
                   )}
                   {item.modifiedBy && (

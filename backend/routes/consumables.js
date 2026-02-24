@@ -70,7 +70,16 @@ router.post('/', async (req, res) => {
       currentStock: consumable.currentStock,
       operator: req.body.operator || req.body.operatorName || '系统',
       reason: '新建耗材',
-      notes: req.body.description || ''
+      notes: req.body.description || '',
+      consumableSnapshot: {
+        category: consumable.category,
+        unit: consumable.unit,
+        unitPrice: consumable.unitPrice,
+        supplier: consumable.supplier,
+        location: consumable.location,
+        minStock: consumable.minStock,
+        maxStock: consumable.maxStock
+      }
     }, { transaction });
     
     await transaction.commit();
@@ -138,7 +147,16 @@ router.post('/import', async (req, res) => {
           currentStock: consumable.currentStock,
           operator,
           reason: '批量导入',
-          notes: ''
+          notes: '',
+          consumableSnapshot: {
+            category: consumable.category,
+            unit: consumable.unit,
+            unitPrice: consumable.unitPrice,
+            supplier: consumable.supplier,
+            location: consumable.location,
+            minStock: consumable.minStock,
+            maxStock: consumable.maxStock
+          }
         }, { transaction });
         
         results.success++;
@@ -337,7 +355,14 @@ router.post('/quick-inout', async (req, res) => {
         operator,
         reason,
         notes,
-        isEditable: false
+        isEditable: false,
+        consumableSnapshot: {
+          category: consumable.category,
+          unit: consumable.unit,
+          unitPrice: consumable.unitPrice,
+          supplier: consumable.supplier,
+          location: consumable.location
+        }
       }, { transaction });
 
       await transaction.commit();
@@ -432,7 +457,14 @@ router.post('/inout', async (req, res) => {
         operator,
         reason,
         notes,
-        isEditable: false
+        isEditable: false,
+        consumableSnapshot: {
+          category: consumable.category,
+          unit: consumable.unit,
+          unitPrice: consumable.unitPrice,
+          supplier: consumable.supplier,
+          location: consumable.location
+        }
       }, { transaction });
 
       await transaction.commit();
@@ -515,7 +547,6 @@ router.post('/adjust', async (req, res) => {
       
       const changeQuantity = newStock - previousStock;
       
-      // 系统生成的调整记录不可编辑
       await ConsumableLog.create({
         consumableId,
         consumableName: consumable.name,
@@ -526,7 +557,14 @@ router.post('/adjust', async (req, res) => {
         operator,
         reason: reason || (adjustType === 'set' ? '库存调整为 ' + newStock : reason),
         notes: adjustType === 'set' ? `库存从 ${previousStock} 调整为 ${newStock}` : notes,
-        isEditable: false
+        isEditable: false,
+        consumableSnapshot: {
+          category: consumable.category,
+          unit: consumable.unit,
+          unitPrice: consumable.unitPrice,
+          supplier: consumable.supplier,
+          location: consumable.location
+        }
       }, { transaction });
       
       await transaction.commit();
@@ -618,7 +656,7 @@ router.get('/logs/export', async (req, res) => {
       order: [['createdAt', 'DESC']]
     });
     
-    const csvHeader = 'ID,耗材ID,耗材名称,操作类型,变动数量,操作前库存,操作后库存,操作人,原因,备注,创建时间,更新时间\n';
+    const csvHeader = 'ID,耗材ID,耗材名称,操作类型,变动数量,操作前库存,操作后库存,操作人,原因,备注,耗材状态,分类,单位,单价,创建时间,更新时间\n';
     const csvRows = logs.map(log => {
       const operationTypeMap = {
         'in': '入库',
@@ -629,6 +667,7 @@ router.get('/logs/export', async (req, res) => {
         'adjust': '调整',
         'import': '导入'
       };
+      const snapshot = log.consumableSnapshot || {};
       return [
         log.id,
         log.consumableId,
@@ -640,6 +679,10 @@ router.get('/logs/export', async (req, res) => {
         log.operator,
         log.reason || '',
         log.notes || '',
+        log.isConsumableDeleted ? '已删除' : '正常',
+        snapshot.category || '',
+        snapshot.unit || '',
+        snapshot.unitPrice || '',
         dayjs(log.createdAt).format('YYYY-MM-DD HH:mm:ss'),
         dayjs(log.updatedAt).format('YYYY-MM-DD HH:mm:ss')
       ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(',');
@@ -754,7 +797,14 @@ router.put('/:id', async (req, res) => {
       currentStock: consumable.currentStock,
       operator: req.body.operator || req.body.operatorName || '系统',
       reason: '信息更新',
-      notes: `更新字段: ${Object.keys(req.body).join(', ')}`
+      notes: `更新字段: ${Object.keys(req.body).join(', ')}`,
+      consumableSnapshot: {
+        category: consumable.category,
+        unit: consumable.unit,
+        unitPrice: consumable.unitPrice,
+        supplier: consumable.supplier,
+        location: consumable.location
+      }
     }, { transaction });
     
     await transaction.commit();
@@ -777,13 +827,47 @@ router.delete('/:id', async (req, res) => {
     const consumableId = consumable.consumableId;
     const consumableName = consumable.name;
     const currentStock = consumable.currentStock;
+    const operator = req.body.operator || req.query.operator || '系统';
+
+    const consumableSnapshot = {
+      category: consumable.category,
+      unit: consumable.unit,
+      unitPrice: consumable.unitPrice,
+      supplier: consumable.supplier,
+      location: consumable.location,
+      description: consumable.description,
+      minStock: consumable.minStock,
+      maxStock: consumable.maxStock,
+      status: consumable.status
+    };
+
+    await ConsumableLog.create({
+      consumableId,
+      consumableName,
+      operationType: 'delete',
+      quantity: -currentStock,
+      previousStock: currentStock,
+      currentStock: 0,
+      operator,
+      reason: '删除耗材',
+      notes: `删除耗材：${consumableName}，删除时库存为 ${currentStock}`,
+      isEditable: false,
+      isConsumableDeleted: true,
+      consumableSnapshot
+    }, { transaction });
+
+    await ConsumableLog.update(
+      {
+        isConsumableDeleted: true,
+        consumableSnapshot
+      },
+      {
+        where: { consumableId },
+        transaction
+      }
+    );
 
     await ConsumableRecord.destroy({
-      where: { consumableId },
-      transaction
-    });
-
-    await ConsumableLog.destroy({
       where: { consumableId },
       transaction
     });
