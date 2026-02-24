@@ -3,14 +3,16 @@
  * 添加缺失的 isConsumableDeleted 字段和 consumableSnapshot 字段
  */
 
-const { sequelize, DB_TYPE } = require('../db');
+const { sequelize, DB_TYPE, dbDialect } = require('../db');
 
 async function fix() {
   try {
     console.log('开始修复 MySQL 数据库字段...');
+    console.log(`DB_TYPE: ${DB_TYPE}, dbDialect: ${dbDialect}`);
 
-    if (DB_TYPE !== 'mysql') {
-      console.log('当前不是 MySQL 数据库，跳过修复');
+    const actualDbType = dbDialect || DB_TYPE;
+    if (actualDbType !== 'mysql') {
+      console.log(`当前数据库类型是 ${actualDbType}，不是 MySQL，跳过修复`);
       process.exit(0);
     }
 
