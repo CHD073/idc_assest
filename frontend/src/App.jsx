@@ -71,6 +71,8 @@ const TicketFieldManagement = lazy(() => import('./pages/TicketFieldManagement')
 const SystemSettings = lazy(() => import('./pages/SystemSettings'));
 const CableManagement = lazy(() => import('./pages/CableManagement'));
 const PortManagement = lazy(() => import('./pages/PortManagement'));
+const InventoryManagement = lazy(() => import('./pages/InventoryManagement'));
+const InventoryTaskExecution = lazy(() => import('./pages/InventoryTaskExecution'));
 
 const { Header, Content, Sider } = Layout;
 
@@ -306,6 +308,18 @@ const AppLayout = ({ children }) => {
           key: 'ticket-fields',
           icon: <DatabaseOutlined style={{ fontSize: '16px' }} />,
           label: <Link to="/ticket-fields">字段管理</Link>,
+        },
+      ],
+    },
+    {
+      key: 'inventory-management',
+      icon: <InboxOutlined style={{ fontSize: '18px' }} />,
+      label: '资产盘点',
+      children: [
+        {
+          key: 'inventory',
+          icon: <InboxOutlined style={{ fontSize: '16px' }} />,
+          label: <Link to="/inventory">盘点计划</Link>,
         },
       ],
     },
@@ -688,6 +702,22 @@ const ThemeConfig = () => {
               element={
                 <PrivateRoute>
                   <CableManagement />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/inventory"
+              element={
+                <PrivateRoute>
+                  <InventoryManagement />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/inventory/execution"
+              element={
+                <PrivateRoute>
+                  <InventoryTaskExecution />
                 </PrivateRoute>
               }
             />

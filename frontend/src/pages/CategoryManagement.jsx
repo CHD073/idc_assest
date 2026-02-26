@@ -182,10 +182,11 @@ function CategoryManagement() {
       >
         <Card size="small" style={{ marginBottom: 16 }}>
           <Space>
-            <Input.Search
+            <Input
               placeholder="搜索分类名称、描述"
               style={{ width: 300 }}
-              onSearch={value => setKeyword(value)}
+              value={keyword}
+              onChange={e => setKeyword(e.target.value)}
               allowClear
             />
             <Select value={status} onChange={setStatus} style={{ width: 120 }}>

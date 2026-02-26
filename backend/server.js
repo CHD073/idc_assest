@@ -45,6 +45,20 @@ sequelize.authenticate()
     return SystemSetting.sync();
   })
   .then(() => {
+    // 同步盘点模型
+    const InventoryPlan = require('./models/InventoryPlan');
+    const InventoryTask = require('./models/InventoryTask');
+    const InventoryRecord = require('./models/InventoryRecord');
+    return Promise.all([
+      InventoryPlan.sync(),
+      InventoryTask.sync(),
+      InventoryRecord.sync()
+    ]);
+  })
+  .then(() => {
+    console.log('盘点模型同步完成');
+  })
+  .then(() => {
     // 初始化系统设置默认值（关键：确保部署时数据正确初始化）
     console.log('开始初始化系统设置默认值...');
     const { initDefaultSettings } = require('./routes/systemSettings');
@@ -112,6 +126,7 @@ const systemSettingsRoutes = require('./routes/systemSettings');
 const cableRoutes = require('./routes/cables');
 const devicePortRoutes = require('./routes/devicePorts');
 const networkCardRoutes = require('./routes/networkCards');
+const inventoryRoutes = require('./routes/inventory');
 
 // 使用路由
 app.use('/api/devices', deviceRoutes);
@@ -132,6 +147,7 @@ app.use('/api/system-settings', systemSettingsRoutes);
 app.use('/api/cables', cableRoutes);
 app.use('/api/device-ports', devicePortRoutes);
 app.use('/api/network-cards', networkCardRoutes);
+app.use('/api/inventory', inventoryRoutes);
 
 // 静态文件服务
 app.use('/uploads', express.static('uploads'));

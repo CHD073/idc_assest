@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useDebounce } from '../hooks/useDebounce';
 import {
   Table,
   Card,
@@ -49,6 +50,7 @@ function ConsumableLogs() {
     consumableId: '',
     dateRange: null,
   });
+  const debouncedConsumableId = useDebounce(filters.consumableId, 300);
   const [importModalVisible, setImportModalVisible] = useState(false);
   const [importType, setImportType] = useState('excel');
   const [importing, setImporting] = useState(false);
@@ -94,12 +96,14 @@ function ConsumableLogs() {
   };
 
   useEffect(() => {
-    fetchLogs(1, pagination.pageSize, filters);
-  }, [filters.operationType, filters.consumableId, filters.dateRange]);
+    fetchLogs(1, pagination.pageSize, {
+      ...filters,
+      consumableId: debouncedConsumableId,
+    });
+  }, [debouncedConsumableId, filters.operationType, filters.dateRange]);
 
   const handleFilterChange = (key, value) => {
     setFilters(prev => ({ ...prev, [key]: value }));
-    fetchLogs(1, pagination.pageSize);
   };
 
   const getOperationTag = type => {
@@ -528,11 +532,12 @@ function ConsumableLogs() {
       >
         <Card size="small" style={{ marginBottom: 16 }}>
           <Space wrap>
-            <Input.Search
+            <Input
               placeholder="搜索耗材ID"
               style={{ width: 200 }}
               allowClear
-              onSearch={value => handleFilterChange('consumableId', value)}
+              value={filters.consumableId}
+              onChange={e => handleFilterChange('consumableId', e.target.value)}
               prefix={<SearchOutlined />}
             />
             <Select

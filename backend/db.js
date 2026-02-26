@@ -32,7 +32,7 @@ if (DB_TYPE === 'mysql') {
   sequelize = new Sequelize({
     dialect: 'sqlite',
     storage: process.env.DB_PATH || './idc_management.db',
-    logging: process.env.NODE_ENV === 'development' ? console.log : false,
+    logging: console.log,
     // SQLite 连接池配置
     pool: {
       max: 5,
