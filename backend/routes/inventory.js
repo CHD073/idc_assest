@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { Op } = require('sequelize');
-const { sequelize } = require('../db');
+const { sequelize, dbDialect } = require('../db');
 const InventoryPlan = require('../models/InventoryPlan');
 const InventoryTask = require('../models/InventoryTask');
 const InventoryRecord = require('../models/InventoryRecord');
@@ -241,7 +241,9 @@ router.post('/plans/:planId/start', async (req, res) => {
     }
 
     if (recordsToCreate.length > 0) {
-      const now = new Date().toISOString();
+      const now = dbDialect === 'mysql' 
+        ? new Date().toISOString().replace('T', ' ').replace('Z', '')
+        : new Date().toISOString();
       const placeholders = recordsToCreate.map(r => 
         `('${r.recordId}', '${r.taskId}', '${r.planId}', '${r.deviceId}', '${r.deviceName}', '${r.deviceType}', '${r.serialNumber || ''}', '${r.rackId}', ${r.position}, 'pending', '${now}', '${now}')`
       ).join(',');
