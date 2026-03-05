@@ -1,4 +1,4 @@
-# IDC设备管理系统
+# IDC设备资产系统
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-20.x-green.svg)](https://nodejs.org/)
