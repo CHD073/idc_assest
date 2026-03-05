@@ -35,7 +35,6 @@ const getFrontendPort = () => {
 const port = getFrontendPort();
 
 export default defineConfig({
-  base: '/',
   plugins: [
     react(),
     Components({
