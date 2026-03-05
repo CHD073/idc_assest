@@ -190,7 +190,34 @@ DB_PATH=./idc_management.db
 node scripts/init-database.js
 ```
 
-#### 5. 启动服务
+#### 5. 数据库迁移
+
+当项目更新后，可能需要执行数据库迁移脚本以更新表结构。迁移脚本支持幂等执行，重复执行不会出错。
+
+**执行迁移脚本：**
+```bash
+cd backend
+node scripts/migrate-all.js
+```
+
+**迁移脚本包含以下内容：**
+| 迁移名称 | 说明 |
+|----------|------|
+| v2.0 - 网卡和端口表 | 创建 network_cards 表，为 device_ports 添加 nic_id 字段 |
+| 用户表 pending 状态 | 为用户表添加 pending 状态支持 |
+| 耗材乐观锁 | 为 consumables 表添加 version 字段 |
+| 耗材操作日志表结构 | 添加 isEditable、originalLogId 等修改记录字段 |
+| 耗材日志解耦 | 添加 isConsumableDeleted 和 consumableSnapshot 字段 |
+| 移除日志外键约束 | 移除 consumable_logs 表的外键约束，防止级联删除 |
+| 耗材日志归档表 | 创建 consumable_log_archives 归档表 |
+| 耗材SN序列号字段 | 为 consumables、consumable_records、consumable_logs 添加 snList 字段 |
+
+**注意事项：**
+- 迁移脚本支持 SQLite 和 MySQL 两种数据库
+- 建议在执行迁移前备份数据库
+- 迁移脚本会自动检测已执行的迁移，避免重复执行
+
+#### 6. 启动服务
 
 ```bash
 # 启动后端（端口8000）

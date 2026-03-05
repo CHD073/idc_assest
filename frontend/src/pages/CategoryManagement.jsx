@@ -16,6 +16,15 @@ import {
 } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined } from '@ant-design/icons';
 import axios from 'axios';
+import {
+  inputStyles,
+  selectStyles,
+  textAreaStyles,
+  inputNumberStyles,
+  filterInputStyles,
+  inputPlaceholders,
+  inputValidationRules,
+} from '../styles/deviceManagementStyles';
 
 const { Option } = Select;
 
@@ -183,18 +192,19 @@ function CategoryManagement() {
         <Card size="small" style={{ marginBottom: 16 }}>
           <Space>
             <Input
-              placeholder="搜索分类名称、描述"
-              style={{ width: 300 }}
+              placeholder={inputPlaceholders.searchCategory}
+              style={{ ...inputStyles.search, width: 300 }}
               value={keyword}
               onChange={e => setKeyword(e.target.value)}
               allowClear
+              prefix={<SearchOutlined />}
             />
-            <Select value={status} onChange={setStatus} style={{ width: 120 }}>
+            <Select value={status} onChange={setStatus} style={{ ...selectStyles.base, width: 120 }}>
               <Option value="all">所有状态</Option>
               <Option value="active">启用</Option>
               <Option value="inactive">停用</Option>
             </Select>
-            <Button onClick={() => fetchCategories()}>刷新</Button>
+            <Button onClick={() => fetchCategories()} style={{ height: '40px', borderRadius: '10px' }}>刷新</Button>
           </Space>
         </Card>
 
@@ -221,30 +231,30 @@ function CategoryManagement() {
             name="name"
             label="分类名称"
             rules={[
-              { required: true, message: '请输入分类名称' },
-              { max: 50, message: '分类名称不能超过50个字符' },
+              inputValidationRules.required('请输入分类名称'),
+              inputValidationRules.maxLength(50, '分类名称不能超过50个字符'),
             ]}
           >
-            <Input placeholder="请输入分类名称" />
+            <Input placeholder="请输入分类名称" style={inputStyles.form} />
           </Form.Item>
           <Form.Item name="description" label="描述">
-            <Input.TextArea rows={3} placeholder="请输入分类描述" maxLength={200} showCount />
+            <Input.TextArea rows={3} placeholder={inputPlaceholders.description} maxLength={200} showCount style={textAreaStyles.base} />
           </Form.Item>
           <Form.Item name="sortOrder" label="排序">
-            <InputNumber min={0} placeholder="数值越小越靠前" style={{ width: '100%' }} />
+            <InputNumber min={0} placeholder="数值越小越靠前" style={inputNumberStyles.base} />
           </Form.Item>
-          <Form.Item name="status" label="状态" rules={[{ required: true, message: '请选择状态' }]}>
-            <Select>
+          <Form.Item name="status" label="状态" rules={[inputValidationRules.required('请选择状态')]}>
+            <Select style={selectStyles.base}>
               <Option value="active">启用</Option>
               <Option value="inactive">停用</Option>
             </Select>
           </Form.Item>
           <Form.Item>
             <Space>
-              <Button type="primary" htmlType="submit">
+              <Button type="primary" htmlType="submit" style={{ height: '40px', borderRadius: '10px' }}>
                 {editingCategory ? '更新' : '创建'}
               </Button>
-              <Button onClick={handleCancel}>取消</Button>
+              <Button onClick={handleCancel} style={{ height: '40px', borderRadius: '10px' }}>取消</Button>
             </Space>
           </Form.Item>
         </Form>

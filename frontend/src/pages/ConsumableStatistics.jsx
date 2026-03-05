@@ -38,6 +38,11 @@ import styled from 'styled-components';
 import dayjs from 'dayjs';
 import api from '../api';
 import { message } from 'antd';
+import {
+  selectStyles,
+  datePickerStyles,
+  inputPlaceholders,
+} from '../styles/deviceManagementStyles';
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
@@ -762,8 +767,9 @@ const ConsumableStatistics = () => {
             <RangePicker
               value={dateRange}
               onChange={setDateRange}
-              style={{ width: '100%' }}
+              style={datePickerStyles.range}
               allowClear={false}
+              placeholder={inputPlaceholders.dateRange}
             />
           </Col>
           <Col xs={24} sm={12} md={8} lg={6}>
@@ -774,7 +780,7 @@ const ConsumableStatistics = () => {
             <Select
               value={categoryFilter}
               onChange={setCategoryFilter}
-              style={{ width: '100%' }}
+              style={selectStyles.base}
               placeholder="选择类别"
             >
               <Option value="all">全部类别</Option>
@@ -791,7 +797,7 @@ const ConsumableStatistics = () => {
               onClick={loadStatistics}
               loading={loading}
               style={{
-                height: 40,
+                height: '40px',
                 borderRadius: designTokens.borderRadius.medium,
                 background: designTokens.colors.primary.gradient,
                 border: 'none',

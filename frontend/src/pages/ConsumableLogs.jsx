@@ -38,6 +38,15 @@ import {
 import axios from 'axios';
 import dayjs from 'dayjs';
 import * as XLSX from 'xlsx';
+import {
+  inputStyles,
+  selectStyles,
+  textAreaStyles,
+  filterInputStyles,
+  datePickerStyles,
+  inputPlaceholders,
+  inputValidationRules,
+} from '../styles/deviceManagementStyles';
 
 const { RangePicker } = DatePicker;
 const { Option } = Select;
@@ -575,8 +584,8 @@ function ConsumableLogs() {
         <Card size="small" style={{ marginBottom: 16 }}>
           <Space wrap>
             <Input
-              placeholder="搜索耗材ID"
-              style={{ width: 200 }}
+              placeholder={inputPlaceholders.consumableId}
+              style={{ ...inputStyles.search, width: 200 }}
               allowClear
               value={filters.consumableId}
               onChange={e => handleFilterChange('consumableId', e.target.value)}
@@ -586,7 +595,7 @@ function ConsumableLogs() {
               mode="multiple"
               value={filters.operationType}
               onChange={value => handleFilterChange('operationType', value)}
-              style={{ width: 200 }}
+              style={{ ...selectStyles.base, width: 200 }}
               placeholder="选择操作类型"
               allowClear
               maxTagCount="responsive"
@@ -602,7 +611,8 @@ function ConsumableLogs() {
             <RangePicker
               value={filters.dateRange}
               onChange={dates => handleFilterChange('dateRange', dates)}
-              placeholder={['开始日期', '结束日期']}
+              placeholder={inputPlaceholders.dateRange}
+              style={datePickerStyles.range}
             />
             <Button
               icon={<HistoryOutlined />}
@@ -610,6 +620,7 @@ function ConsumableLogs() {
                 setFilters({ operationType: ['in', 'out'], consumableId: '', dateRange: null });
                 fetchLogs(1, pagination.pageSize);
               }}
+              style={{ height: '40px', borderRadius: '10px' }}
             >
               重置筛选
             </Button>
@@ -631,11 +642,11 @@ function ConsumableLogs() {
                 ],
               }}
             >
-              <Button icon={<DownloadOutlined />}>
+              <Button icon={<DownloadOutlined />} style={{ height: '40px', borderRadius: '10px' }}>
                 导出 <DownOutlined />
               </Button>
             </Dropdown>
-            <Button icon={<UploadOutlined />} onClick={() => setImportModalVisible(true)}>
+            <Button icon={<UploadOutlined />} onClick={() => setImportModalVisible(true)} style={{ height: '40px', borderRadius: '10px' }}>
               导入
             </Button>
           </Space>
@@ -720,20 +731,20 @@ function ConsumableLogs() {
       >
         <Form form={form} layout="vertical" onFinish={handleEditSubmit}>
           <Form.Item label="操作原因" name="reason">
-            <Input.TextArea rows={2} placeholder="请输入操作原因" />
+            <Input.TextArea rows={2} placeholder={inputPlaceholders.reason} style={textAreaStyles.base} />
           </Form.Item>
           <Form.Item label="备注" name="notes">
-            <Input.TextArea rows={3} placeholder="请输入备注信息" />
+            <Input.TextArea rows={3} placeholder={inputPlaceholders.notes} style={textAreaStyles.base} />
           </Form.Item>
           <Form.Item
             label="修改原因"
             name="modificationReason"
-            rules={[{ required: true, message: '请输入修改原因' }]}
+            rules={[inputValidationRules.required('请输入修改原因')]}
           >
-            <Input.TextArea rows={2} placeholder="请输入修改原因（必填）" />
+            <Input.TextArea rows={2} placeholder="请输入修改原因（必填）" style={textAreaStyles.base} />
           </Form.Item>
           <Form.Item label="修改人" name="operator">
-            <Input placeholder="请输入修改人姓名" />
+            <Input placeholder={inputPlaceholders.operator} style={inputStyles.form} />
           </Form.Item>
         </Form>
       </Modal>

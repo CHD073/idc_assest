@@ -450,6 +450,369 @@ export const resizableTitleStyles = {
   },
 };
 
+// ============================================
+// 输入框统一样式配置
+// ============================================
+
+// 输入框基础样式
+export const inputStyles = {
+  // 基础输入框样式
+  base: {
+    height: '40px',
+    borderRadius: borderRadius.medium,
+    border: `1px solid ${colors.border.light}`,
+    fontSize: '14px',
+    transition: `all ${transitions.fast}`,
+  },
+
+  // 搜索输入框样式
+  search: {
+    height: '40px',
+    borderRadius: borderRadius.medium,
+    border: `1px solid ${colors.border.light}`,
+    fontSize: '14px',
+    transition: `all ${transitions.fast}`,
+    backgroundColor: colors.background.primary,
+  },
+
+  // 表单输入框样式
+  form: {
+    height: '40px',
+    borderRadius: borderRadius.medium,
+    border: `1px solid ${colors.border.light}`,
+    fontSize: '14px',
+    transition: `all ${transitions.fast}`,
+  },
+
+  // 小尺寸输入框
+  small: {
+    height: '32px',
+    borderRadius: borderRadius.small,
+    fontSize: '13px',
+  },
+
+  // 大尺寸输入框
+  large: {
+    height: '48px',
+    borderRadius: borderRadius.medium,
+    fontSize: '16px',
+  },
+
+  // 禁用状态
+  disabled: {
+    backgroundColor: colors.background.tertiary,
+    color: colors.text.tertiary,
+    cursor: 'not-allowed',
+  },
+
+  // 错误状态
+  error: {
+    borderColor: colors.error.main,
+    boxShadow: `0 0 0 2px ${colors.error.main}20`,
+  },
+
+  // 焦点状态
+  focus: {
+    borderColor: colors.primary.main,
+    boxShadow: `0 0 0 3px ${colors.primary.main}15`,
+  },
+};
+
+// Select 选择器样式
+export const selectStyles = {
+  // 基础选择器样式
+  base: {
+    height: '40px',
+    borderRadius: borderRadius.medium,
+    fontSize: '14px',
+  },
+
+  // 小尺寸选择器
+  small: {
+    height: '32px',
+    borderRadius: borderRadius.small,
+    fontSize: '13px',
+  },
+
+  // 大尺寸选择器
+  large: {
+    height: '48px',
+    borderRadius: borderRadius.medium,
+    fontSize: '16px',
+  },
+
+  // 下拉菜单样式
+  dropdown: {
+    borderRadius: borderRadius.medium,
+    boxShadow: shadows.large,
+    border: `1px solid ${colors.border.light}`,
+  },
+
+  // 选项样式
+  option: {
+    padding: '8px 12px',
+    fontSize: '14px',
+    transition: `background-color ${transitions.fast}`,
+  },
+};
+
+// InputNumber 数字输入框样式
+export const inputNumberStyles = {
+  // 基础样式
+  base: {
+    width: '100%',
+    height: '40px',
+    borderRadius: borderRadius.medium,
+    border: `1px solid ${colors.border.light}`,
+    fontSize: '14px',
+  },
+
+  // 小尺寸
+  small: {
+    height: '32px',
+    borderRadius: borderRadius.small,
+    fontSize: '13px',
+  },
+
+  // 大尺寸
+  large: {
+    height: '48px',
+    borderRadius: borderRadius.medium,
+    fontSize: '16px',
+  },
+};
+
+// TextArea 文本域样式
+export const textAreaStyles = {
+  // 基础样式
+  base: {
+    borderRadius: borderRadius.medium,
+    border: `1px solid ${colors.border.light}`,
+    fontSize: '14px',
+    padding: '10px 12px',
+    transition: `all ${transitions.fast}`,
+    resize: 'vertical',
+    minHeight: '80px',
+  },
+
+  // 小尺寸
+  small: {
+    fontSize: '13px',
+    padding: '8px 10px',
+    minHeight: '60px',
+  },
+
+  // 大尺寸
+  large: {
+    fontSize: '16px',
+    padding: '12px 14px',
+    minHeight: '100px',
+  },
+};
+
+// DatePicker 日期选择器样式
+export const datePickerStyles = {
+  // 基础样式
+  base: {
+    height: '40px',
+    borderRadius: borderRadius.medium,
+    border: `1px solid ${colors.border.light}`,
+    fontSize: '14px',
+    width: '100%',
+  },
+
+  // 小尺寸
+  small: {
+    height: '32px',
+    borderRadius: borderRadius.small,
+    fontSize: '13px',
+  },
+
+  // 大尺寸
+  large: {
+    height: '48px',
+    borderRadius: borderRadius.medium,
+    fontSize: '16px',
+  },
+
+  // 范围选择器
+  range: {
+    height: '40px',
+    borderRadius: borderRadius.medium,
+    border: `1px solid ${colors.border.light}`,
+    fontSize: '14px',
+  },
+};
+
+// 表单标签样式
+export const formLabelStyles = {
+  // 基础标签样式
+  base: {
+    fontSize: '14px',
+    fontWeight: '500',
+    color: colors.text.primary,
+    marginBottom: '6px',
+    display: 'block',
+  },
+
+  // 必填标签样式
+  required: {
+    fontSize: '14px',
+    fontWeight: '500',
+    color: colors.text.primary,
+    marginBottom: '6px',
+  },
+
+  // 小标签
+  small: {
+    fontSize: '13px',
+    fontWeight: '500',
+    color: colors.text.secondary,
+    marginBottom: '4px',
+  },
+};
+
+// 表单项样式
+export const formItemStyles = {
+  // 基础表单项
+  base: {
+    marginBottom: '20px',
+  },
+
+  // 紧凑表单项
+  compact: {
+    marginBottom: '12px',
+  },
+
+  // 错误状态
+  error: {
+    marginBottom: '20px',
+  },
+
+  // 错误提示文字
+  errorText: {
+    color: colors.error.main,
+    fontSize: '12px',
+    marginTop: '4px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px',
+  },
+};
+
+// 过滤器区域输入框样式
+export const filterInputStyles = {
+  // 过滤器输入框容器
+  container: {
+    marginBottom: '6px',
+    fontSize: '13px',
+    color: colors.text.secondary,
+    fontWeight: '500',
+  },
+
+  // 过滤器输入框
+  input: {
+    height: '40px',
+    borderRadius: borderRadius.medium,
+    border: `1px solid ${colors.border.light}`,
+    fontSize: '14px',
+    width: '100%',
+  },
+
+  // 过滤器选择器
+  select: {
+    height: '40px',
+    borderRadius: borderRadius.medium,
+    fontSize: '14px',
+    width: '100%',
+  },
+};
+
+// 输入框验证规则配置
+export const inputValidationRules = {
+  // 必填规则
+  required: (message = '此字段为必填项') => ({
+    required: true,
+    message,
+  }),
+
+  // 最大长度规则
+  maxLength: (max, message) => ({
+    max,
+    message: message || `不能超过${max}个字符`,
+  }),
+
+  // 最小长度规则
+  minLength: (min, message) => ({
+    min,
+    message: message || `不能少于${min}个字符`,
+  }),
+
+  // 数字范围规则
+  numberRange: (min, max, message) => ({
+    type: 'number',
+    min,
+    max,
+    message: message || `数值应在${min}到${max}之间`,
+  }),
+
+  // 正整数规则
+  positiveInteger: () => ({
+    pattern: /^\d+$/,
+    message: '请输入正整数',
+  }),
+
+  // 价格规则（两位小数）
+  price: () => ({
+    pattern: /^\d+(\.\d{1,2})?$/,
+    message: '请输入有效的价格（最多两位小数）',
+  }),
+
+  // 邮箱规则
+  email: () => ({
+    type: 'email',
+    message: '请输入有效的邮箱地址',
+  }),
+
+  // 手机号规则
+  phone: () => ({
+    pattern: /^1[3-9]\d{9}$/,
+    message: '请输入有效的手机号码',
+  }),
+};
+
+// 输入框占位符文本配置
+export const inputPlaceholders = {
+  // 耗材相关
+  consumableName: '请输入耗材名称',
+  consumableId: '请输入耗材ID',
+  category: '请选择分类',
+  unit: '如: 个、盒、卷、箱',
+  stock: '请输入库存数量',
+  minStock: '请输入最小库存',
+  maxStock: '请输入最大库存',
+  unitPrice: '请输入单价',
+  supplier: '请输入供应商名称',
+  location: '如: A柜-01层、B区货架3',
+  description: '请输入描述信息',
+  operator: '请输入操作人姓名',
+  reason: '请输入原因',
+  notes: '请输入备注信息',
+  snList: '输入SN后按回车添加',
+
+  // 搜索相关
+  search: '搜索...',
+  searchConsumable: '搜索耗材ID、名称、分类、供应商',
+  searchCategory: '搜索分类名称、描述',
+
+  // 日期相关
+  dateRange: ['开始日期', '结束日期'],
+
+  // 通用
+  select: '请选择',
+  input: '请输入',
+};
+
 // CSS-in-JS 样式字符串生成函数
 export const generateGlobalStyles = tokens => `
   .device-modal .ant-modal-close {

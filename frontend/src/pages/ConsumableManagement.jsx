@@ -46,6 +46,15 @@ import {
 } from '@ant-design/icons';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
+import {
+  inputStyles,
+  selectStyles,
+  inputNumberStyles,
+  textAreaStyles,
+  filterInputStyles,
+  inputPlaceholders,
+  inputValidationRules,
+} from '../styles/deviceManagementStyles';
 
 const { Option } = Select;
 const { Text, Title } = Typography;
@@ -871,26 +880,27 @@ function ConsumableManagement() {
             >
               <Row gutter={[16, 16]} align="middle">
                 <Col xs={24} sm={12} md={8} lg={8}>
-                  <div style={{ marginBottom: '6px', fontSize: '13px', color: designTokens.colors.neutral[600], fontWeight: 500 }}>
+                  <div style={filterInputStyles.container}>
                     搜索
                   </div>
                   <Input
-                    placeholder="搜索耗材ID、名称、分类、供应商"
+                    placeholder={inputPlaceholders.searchConsumable}
                     value={keyword}
                     onChange={e => handleSearch(e.target.value)}
                     onPressEnter={() => fetchConsumables()}
                     prefix={<SearchOutlined style={{ color: designTokens.colors.neutral[400] }} />}
                     allowClear
+                    style={filterInputStyles.input}
                   />
                 </Col>
 
                 <Col xs={24} sm={12} md={6} lg={5}>
-                  <div style={{ marginBottom: '6px', fontSize: '13px', color: designTokens.colors.neutral[600], fontWeight: 500 }}>
+                  <div style={filterInputStyles.container}>
                     分类
                   </div>
                   <Select
-                    placeholder="选择分类"
-                    style={{ width: '100%' }}
+                    placeholder={inputPlaceholders.category}
+                    style={filterInputStyles.select}
                     value={category}
                     onChange={setCategory}
                     allowClear
@@ -905,12 +915,12 @@ function ConsumableManagement() {
                 </Col>
 
                 <Col xs={24} sm={12} md={6} lg={5}>
-                  <div style={{ marginBottom: '6px', fontSize: '13px', color: designTokens.colors.neutral[600], fontWeight: 500 }}>
+                  <div style={filterInputStyles.container}>
                     状态
                   </div>
                   <Select
                     placeholder="选择状态"
-                    style={{ width: '100%' }}
+                    style={filterInputStyles.select}
                     value={status}
                     onChange={setStatus}
                   >
@@ -931,6 +941,7 @@ function ConsumableManagement() {
                         background: designTokens.colors.primary.gradient, 
                         border: 'none',
                         borderRadius: designTokens.borderRadius.sm,
+                        height: '40px',
                       }}
                     >
                       筛选
@@ -939,7 +950,7 @@ function ConsumableManagement() {
                       <Button 
                         icon={<ClearOutlined />} 
                         onClick={handleReset}
-                        style={{ borderRadius: designTokens.borderRadius.sm }}
+                        style={{ borderRadius: designTokens.borderRadius.sm, height: '40px' }}
                       />
                     </Tooltip>
                   </Space>
@@ -1092,17 +1103,17 @@ function ConsumableManagement() {
         <Form form={form} layout="vertical" onFinish={handleSubmit} style={{ marginTop: '16px' }}>
           <Row gutter={16}>
             <Col span={12}>
-              <Form.Item name="name" label="名称" rules={[{ required: true, message: '请输入名称' }]}>
-                <Input placeholder="请输入耗材名称" />
+              <Form.Item name="name" label="名称" rules={[inputValidationRules.required('请输入名称')]}>
+                <Input placeholder={inputPlaceholders.consumableName} style={inputStyles.form} />
               </Form.Item>
             </Col>
             <Col span={12}>
               <Form.Item
                 name="category"
                 label="分类"
-                rules={[{ required: true, message: '请选择分类' }]}
+                rules={[inputValidationRules.required('请选择分类')]}
               >
-                <Select placeholder="请选择分类" allowClear>
+                <Select placeholder={inputPlaceholders.category} allowClear style={selectStyles.base}>
                   {categories.map(cat => (
                     <Option key={cat.id} value={cat.name}>
                       {cat.name}
@@ -1118,28 +1129,28 @@ function ConsumableManagement() {
               <Form.Item
                 name="unit"
                 label="单位"
-                rules={[{ required: true, message: '请输入单位' }]}
+                rules={[inputValidationRules.required('请输入单位')]}
                 initialValue="个"
               >
-                <Input placeholder="如: 个、盒、卷、箱" />
+                <Input placeholder={inputPlaceholders.unit} style={inputStyles.form} />
               </Form.Item>
             </Col>
             <Col span={8}>
               <Form.Item
                 name="currentStock"
                 label="当前库存"
-                rules={[{ required: true, message: '请输入当前库存' }]}
+                rules={[inputValidationRules.required('请输入当前库存')]}
               >
-                <InputNumber min={0} style={{ width: '100%' }} placeholder="请输入当前库存" />
+                <InputNumber min={0} style={inputNumberStyles.base} placeholder={inputPlaceholders.stock} />
               </Form.Item>
             </Col>
             <Col span={8}>
               <Form.Item
                 name="minStock"
                 label="最小库存"
-                rules={[{ required: true, message: '请输入最小库存' }]}
+                rules={[inputValidationRules.required('请输入最小库存')]}
               >
-                <InputNumber min={0} style={{ width: '100%' }} placeholder="请输入最小库存" />
+                <InputNumber min={0} style={inputNumberStyles.base} placeholder={inputPlaceholders.minStock} />
               </Form.Item>
             </Col>
           </Row>
@@ -1163,9 +1174,9 @@ function ConsumableManagement() {
                     <Form.Item
                       name="maxStock"
                       noStyle
-                      rules={[{ required: true, message: '请输入最大库存' }]}
+                      rules={[inputValidationRules.required('请输入最大库存')]}
                     >
-                      <InputNumber min={0} style={{ width: '100%' }} placeholder="请输入最大库存" />
+                      <InputNumber min={0} style={inputNumberStyles.base} placeholder={inputPlaceholders.maxStock} />
                     </Form.Item>
                   )}
                 </Space>
@@ -1177,8 +1188,8 @@ function ConsumableManagement() {
                   min={0}
                   step={0.01}
                   precision={2}
-                  style={{ width: '100%' }}
-                  placeholder="请输入单价"
+                  style={inputNumberStyles.base}
+                  placeholder={inputPlaceholders.unitPrice}
                   prefix="¥"
                 />
               </Form.Item>
@@ -1188,18 +1199,18 @@ function ConsumableManagement() {
           <Row gutter={16}>
             <Col span={12}>
               <Form.Item name="supplier" label="供应商">
-                <Input placeholder="请输入供应商" />
+                <Input placeholder={inputPlaceholders.supplier} style={inputStyles.form} />
               </Form.Item>
             </Col>
             <Col span={12}>
               <Form.Item name="location" label="存放位置">
-                <Input placeholder="如: A柜-01层、B区货架3" />
+                <Input placeholder={inputPlaceholders.location} style={inputStyles.form} />
               </Form.Item>
             </Col>
           </Row>
 
           <Form.Item name="description" label="描述">
-            <TextArea rows={3} placeholder="请输入描述信息" />
+            <TextArea rows={3} placeholder={inputPlaceholders.description} style={textAreaStyles.base} />
           </Form.Item>
 
           <Form.Item label={
@@ -1289,8 +1300,8 @@ function ConsumableManagement() {
             )}
           </Form.Item>
 
-          <Form.Item name="status" label="状态" rules={[{ required: true, message: '请选择状态' }]}>
-            <Select placeholder="请选择状态">
+          <Form.Item name="status" label="状态" rules={[inputValidationRules.required('请选择状态')]}>
+            <Select placeholder="请选择状态" style={selectStyles.base}>
               <Option value="active">启用</Option>
               <Option value="inactive">停用</Option>
             </Select>
@@ -1478,10 +1489,10 @@ function ConsumableManagement() {
       >
         <Form form={stockForm} layout="vertical" onFinish={handleStockSubmit} style={{ marginTop: '16px' }}>
           <Form.Item name="consumableId" label="耗材ID">
-            <Input disabled />
+            <Input disabled style={{ ...inputStyles.form, ...inputStyles.disabled }} />
           </Form.Item>
           <Form.Item name="consumableName" label="耗材名称">
-            <Input disabled />
+            <Input disabled style={{ ...inputStyles.form, ...inputStyles.disabled }} />
           </Form.Item>
           
           {stockType === 'out' && stockRecord?.snList && stockRecord.snList.length > 0 && (
@@ -1500,7 +1511,7 @@ function ConsumableManagement() {
                   allowClear
                   value={snSearchKeyword}
                   onChange={e => setSnSearchKeyword(e.target.value)}
-                  style={{ marginBottom: '8px' }}
+                  style={{ ...inputStyles.search, marginBottom: '8px' }}
                 />
                 <Space size="small" style={{ marginBottom: '8px' }}>
                   <Button 
@@ -1576,8 +1587,8 @@ function ConsumableManagement() {
             <Form.Item name="snList" label="入库SN序列号（可选）">
               <Select
                 mode="tags"
-                style={{ width: '100%' }}
-                placeholder="输入SN后按回车添加"
+                style={selectStyles.base}
+                placeholder={inputPlaceholders.snList}
                 tokenSeparators={[',', '\n']}
               />
             </Form.Item>
@@ -1586,23 +1597,23 @@ function ConsumableManagement() {
           <Form.Item
             name="quantity"
             label="数量"
-            rules={[{ required: true, message: '请输入数量' }]}
+            rules={[inputValidationRules.required('请输入数量')]}
           >
             <InputNumber 
               min={1} 
               max={stockType === 'out' && stockRecord?.snList?.length > 0 ? stockRecord.snList.length : undefined}
-              style={{ width: '100%' }} 
+              style={inputNumberStyles.base} 
               placeholder="请输入数量" 
             />
           </Form.Item>
           <Form.Item name="operator" label="操作人">
-            <Input placeholder="请输入操作人姓名" />
+            <Input placeholder={inputPlaceholders.operator} style={inputStyles.form} />
           </Form.Item>
           <Form.Item name="reason" label={stockType === 'in' ? '入库原因' : '出库原因'}>
-            <Input placeholder={stockType === 'in' ? '如: 采购入库' : '如: 部门领用、报损出库'} />
+            <Input placeholder={stockType === 'in' ? '如: 采购入库' : '如: 部门领用、报损出库'} style={inputStyles.form} />
           </Form.Item>
           <Form.Item name="notes" label="备注">
-            <TextArea rows={2} placeholder="请输入备注信息" />
+            <TextArea rows={2} placeholder={inputPlaceholders.notes} style={textAreaStyles.base} />
           </Form.Item>
           <Form.Item>
             <Space>
