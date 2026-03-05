@@ -125,8 +125,11 @@
 我们提供了交互式安装脚本，自动完成所有部署步骤：
 
 ```bash
-# 克隆项目
+# 克隆项目（选择其一）
+# Gitee（国内推荐）
 git clone https://gitee.com/zhang96110/idc_assest.git
+# GitHub
+git clone https://github.com/gituib/idc_assest.git
 cd idc_assest
 
 # 运行交互式安装脚本
@@ -151,7 +154,11 @@ node install.js
 #### 1. 克隆项目
 
 ```bash
+# 选择其一
+# Gitee（国内推荐）
 git clone https://gitee.com/zhang96110/idc_assest.git
+# GitHub
+git clone https://github.com/gituib/idc_assest.git
 cd idc_assest
 ```
 
@@ -631,7 +638,8 @@ SOFTWARE.
 
 ## 联系与支持
 
-- 问题反馈：https://gitee.com/zhang96110/idc_assest/issues
+- **Gitee Issues**: https://gitee.com/zhang96110/idc_assest/issues
+- **GitHub Issues**: https://github.com/gituib/idc_assest/issues
 - 功能建议：提交 Issue 并标注 `feature-request`
 
 ---

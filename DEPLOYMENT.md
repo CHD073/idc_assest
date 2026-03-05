@@ -26,8 +26,11 @@
 我们提供了交互式安装脚本，自动完成环境检测、依赖安装、数据库初始化和服务启动。
 
 ```bash
-# 克隆项目
+# 克隆项目（选择其一）
+# Gitee（国内推荐）
 git clone https://gitee.com/zhang96110/idc_assest.git
+# GitHub
+git clone https://github.com/gituib/idc_assest.git
 cd idc_assest
 
 # 运行部署脚本
@@ -481,7 +484,11 @@ EXIT;
 
 ```bash
 cd /var/www
+# 选择其一
+# Gitee（国内推荐）
 sudo git clone https://gitee.com/zhang96110/idc_assest.git
+# GitHub
+sudo git clone https://github.com/gituib/idc_assest.git
 sudo chown -R idcadmin:idcadmin idc_assest
 ```
 
