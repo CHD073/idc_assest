@@ -954,6 +954,37 @@ export const generateGlobalStyles = tokens => `
     background: inherit !important;
   }
   
+  /* 表单输入框增强样式 */
+  .form-input-enhanced:hover {
+    border-color: ${tokens.colors.primary.main} !important;
+    box-shadow: 0 2px 8px rgba(24, 144, 255, 0.1) !important;
+  }
+  
+  .form-input-enhanced:focus,
+  .form-input-enhanced.ant-input-focused,
+  .form-input-enhanced.ant-select-focused .ant-select-selector,
+  .form-input-enhanced.ant-input-number-focused {
+    border-color: ${tokens.colors.primary.main} !important;
+    box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2) !important;
+  }
+  
+  /* 表单项标签增强 */
+  .device-modal .ant-form-item-label > label {
+    font-weight: 500;
+    color: ${tokens.colors.text.primary};
+    font-size: 14px;
+  }
+  
+  /* 表单项间距优化 */
+  .device-modal .ant-form-item {
+    margin-bottom: 20px;
+  }
+  
+  /* 必填项标识动画 */
+  .device-modal .ant-form-item-label > label::after {
+    content: '';
+  }
+  
   @media screen and (max-width: 768px) {
     .device-table-wrapper .ant-table-tbody > tr > td {
       max-width: 150px !important;

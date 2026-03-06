@@ -229,6 +229,8 @@ function DeviceManagement() {
   const [devices, setDevices] = useState([]);
   const [allDevices, setAllDevices] = useState([]);
   const [racks, setRacks] = useState([]);
+  const [rooms, setRooms] = useState([]);
+  const [selectedRoomId, setSelectedRoomId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
@@ -361,9 +363,9 @@ function DeviceManagement() {
       fieldName: 'deviceId',
       displayName: '设备ID',
       fieldType: 'string',
-      required: true,
+      required: false,
       order: 1,
-      visible: true,
+      visible: false,
     },
     {
       fieldName: 'name',
@@ -392,7 +394,7 @@ function DeviceManagement() {
       fieldName: 'model',
       displayName: '型号',
       fieldType: 'string',
-      required: true,
+      required: false,
       order: 4,
       visible: true,
     },
@@ -454,7 +456,7 @@ function DeviceManagement() {
       fieldName: 'purchaseDate',
       displayName: '购买日期',
       fieldType: 'date',
-      required: true,
+      required: false,
       order: 11,
       visible: true,
     },
@@ -462,7 +464,7 @@ function DeviceManagement() {
       fieldName: 'warrantyExpiry',
       displayName: '保修到期',
       fieldType: 'date',
-      required: true,
+      required: false,
       order: 12,
       visible: true,
     },
@@ -487,8 +489,9 @@ function DeviceManagement() {
   // 获取所有机柜
   const fetchRacks = async () => {
     try {
-      const response = await axios.get('/api/racks');
-      // 现在API返回的格式是 { racks: [], total: number }
+      const response = await axios.get('/api/racks', {
+        params: { pageSize: 1000 }
+      });
       setRacks(response.data.racks || []);
     } catch (error) {
       message.error('获取机柜列表失败');
@@ -496,9 +499,21 @@ function DeviceManagement() {
     }
   };
 
+  // 获取所有机房
+  const fetchRooms = async () => {
+    try {
+      const response = await axios.get('/api/rooms');
+      setRooms(response.data || []);
+    } catch (error) {
+      message.error('获取机房列表失败');
+      console.error('获取机房列表失败:', error);
+    }
+  };
+
   useEffect(() => {
     fetchDevices(1, pagination.pageSize);
     fetchRacks();
+    fetchRooms();
     fetchDeviceFields();
   }, [fetchDevices]);
 
@@ -576,8 +591,17 @@ function DeviceManagement() {
       }
 
       form.setFieldsValue(cleanDeviceData);
+
+      // 编辑设备时，根据 rackId 找到对应的机房并设置 selectedRoomId
+      if (device.rackId) {
+        const rack = racks.find(r => r.rackId === device.rackId);
+        if (rack) {
+          setSelectedRoomId(rack.roomId);
+        }
+      }
     } else {
       form.resetFields();
+      setSelectedRoomId(null);
     }
     setModalVisible(true);
   };
@@ -586,12 +610,12 @@ function DeviceManagement() {
   const handleCancel = () => {
     setModalVisible(false);
     setEditingDevice(null);
+    setSelectedRoomId(null);
   };
 
   // 提交表单
   const handleSubmit = async values => {
     try {
-      // 定义设备模型的固定字段
       const fixedFields = [
         'deviceId',
         'name',
@@ -607,24 +631,24 @@ function DeviceManagement() {
         'warrantyExpiry',
         'ipAddress',
         'description',
+        'roomId',
       ];
 
-      // 构建最终的设备数据，包含固定字段和自定义字段
       const deviceData = {
         ...values,
         purchaseDate: values.purchaseDate ? values.purchaseDate.format('YYYY-MM-DD') : null,
         warrantyExpiry: values.warrantyExpiry ? values.warrantyExpiry.format('YYYY-MM-DD') : null,
-        customFields: {}, // 用于存储自定义字段
+        customFields: {},
       };
 
-      // 分离固定字段和自定义字段
       Object.keys(deviceData).forEach(key => {
         if (!fixedFields.includes(key) && key !== 'customFields') {
-          // 将非固定字段移动到customFields对象中
           deviceData.customFields[key] = deviceData[key];
           delete deviceData[key];
         }
       });
+
+      delete deviceData.roomId;
 
       if (editingDevice) {
         // 更新设备
@@ -640,7 +664,8 @@ function DeviceManagement() {
       fetchDevices();
       setEditingDevice(null);
     } catch (error) {
-      message.error(editingDevice ? '设备更新失败' : '设备创建失败');
+      const errorMsg = error.response?.data?.error || error.message || '未知错误';
+      message.error(editingDevice ? `设备更新失败: ${errorMsg}` : `设备创建失败: ${errorMsg}`);
       console.error(editingDevice ? '设备更新失败:' : '设备创建失败:', error);
     }
   };
@@ -1242,17 +1267,17 @@ function DeviceManagement() {
   // 保存字段配置
   const handleSaveFieldConfig = async values => {
     try {
-      // 更新设备字段配置的可见性
       const updatedFields = deviceFields.map(field => ({
-        ...field,
-        visible: values[field.fieldName],
+        fieldId: field.fieldId,
+        fieldName: field.fieldName,
+        displayName: field.displayName,
+        visible: values[`visible_${field.fieldName}`] ?? field.visible,
+        required: values[`required_${field.fieldName}`] ?? field.required,
       }));
 
-      // 保存到后端
-      await axios.post('/api/deviceFields/config', updatedFields);
+      const response = await axios.post('/api/deviceFields/config', updatedFields);
 
-      // 更新本地状态
-      setDeviceFields(updatedFields);
+      setDeviceFields(response.data);
       message.success('字段配置保存成功');
       setFieldConfigModalVisible(false);
     } catch (error) {
@@ -1616,10 +1641,18 @@ function DeviceManagement() {
         className="device-modal"
       >
         <Form form={form} layout="vertical" onFinish={handleSubmit}>
-          {deviceFields
-            .filter(field => field.fieldName !== 'deviceId')
-            .map(field => {
+          {(() => {
+            const filteredFields = deviceFields.filter(
+              field => field.fieldName !== 'deviceId' && field.fieldName !== 'rackId'
+            );
+            const formItems = [];
+
+            filteredFields.forEach((field, index) => {
               let control = null;
+              const inputStyle = {
+                borderRadius: '8px',
+                transition: 'all 0.3s ease',
+              };
 
               switch (field.fieldType) {
                 case 'text':
@@ -1627,7 +1660,8 @@ function DeviceManagement() {
                   control = (
                     <Input
                       placeholder={`请输入${field.displayName}`}
-                      style={{ borderRadius: '8px' }}
+                      style={inputStyle}
+                      className="form-input-enhanced"
                     />
                   );
                   break;
@@ -1636,7 +1670,8 @@ function DeviceManagement() {
                     <InputNumber
                       placeholder={`请输入${field.displayName}`}
                       min={0}
-                      style={{ width: '100%', borderRadius: '8px' }}
+                      style={{ width: '100%', ...inputStyle }}
+                      className="form-input-enhanced"
                     />
                   );
                   break;
@@ -1646,8 +1681,9 @@ function DeviceManagement() {
                 case 'date':
                   control = (
                     <DatePicker
-                      style={{ width: '100%', borderRadius: '8px' }}
+                      style={{ width: '100%', ...inputStyle }}
                       placeholder={`请选择${field.displayName}`}
+                      className="form-input-enhanced"
                     />
                   );
                   break;
@@ -1656,90 +1692,250 @@ function DeviceManagement() {
                     <Input.TextArea
                       placeholder={`请输入${field.displayName}`}
                       rows={3}
-                      style={{ borderRadius: '8px' }}
+                      style={inputStyle}
+                      className="form-input-enhanced"
                     />
                   );
                   break;
                 case 'select':
-                  if (field.fieldName === 'rackId') {
-                    control = (
-                      <Select
-                        placeholder={`请选择${field.displayName}`}
-                        style={{ borderRadius: '8px' }}
-                      >
-                        {racks.map(rack => (
-                          <Option key={rack.rackId} value={rack.rackId}>
-                            {rack.name} ({rack.rackId})
+                  control = (
+                    <Select
+                      placeholder={`请选择${field.displayName}`}
+                      style={inputStyle}
+                      className="form-input-enhanced"
+                    >
+                      {field.options &&
+                        field.options.map(option => (
+                          <Option key={option.value} value={option.value}>
+                            {option.label}
                           </Option>
                         ))}
-                      </Select>
-                    );
-                  } else {
-                    control = (
-                      <Select
-                        placeholder={`请选择${field.displayName}`}
-                        style={{ borderRadius: '8px' }}
-                      >
-                        {field.options &&
-                          field.options.map(option => (
-                            <Option key={option.value} value={option.value}>
-                              {option.label}
-                            </Option>
-                          ))}
-                      </Select>
-                    );
-                  }
+                    </Select>
+                  );
                   break;
                 default:
                   control = (
                     <Input
                       placeholder={`请输入${field.displayName}`}
-                      style={{ borderRadius: '8px' }}
+                      style={inputStyle}
+                      className="form-input-enhanced"
                     />
                   );
               }
 
-              return (
-                <Form.Item
-                  key={field.fieldName}
-                  name={field.fieldName}
-                  label={field.displayName}
-                  rules={
-                    field.required && field.fieldName !== 'deviceId'
-                      ? [{ required: true, message: `请输入${field.displayName}` }]
-                      : []
-                  }
-                >
-                  {control}
-                </Form.Item>
-              );
-            })}
+              // 机房和机柜联动选择区域特殊处理
+              if (field.fieldName === 'serialNumber') {
+                formItems.push(
+                  <React.Fragment key={field.fieldName}>
+                    <Col span={12} key={`${field.fieldName}-col`}>
+                      <Form.Item
+                        name={field.fieldName}
+                        label={
+                          <span>
+                            {field.displayName}
+                            {field.required && (
+                              <span style={{ color: '#ff4d4f', marginLeft: '4px' }}>*</span>
+                            )}
+                          </span>
+                        }
+                        rules={
+                          field.required
+                            ? [{ required: true, message: `请输入${field.displayName}` }]
+                            : []
+                        }
+                      >
+                        {control}
+                      </Form.Item>
+                    </Col>
+                    {/* 机房机柜联动选择区域 - 特殊突出显示 */}
+                    <Col span={24} key="room-rack-section">
+                      <div
+                        style={{
+                          background: 'linear-gradient(135deg, #f0f5ff 0%, #e6f7ff 100%)',
+                          borderRadius: '12px',
+                          padding: '20px',
+                          marginBottom: '16px',
+                          border: '2px solid #d6e4ff',
+                          boxShadow: '0 2px 8px rgba(24, 144, 255, 0.1)',
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: '14px',
+                            fontWeight: '600',
+                            color: '#1890ff',
+                            marginBottom: '16px',
+                            display: 'flex',
+                            alignItems: 'center',
+                          }}
+                        >
+                          <DatabaseOutlined style={{ marginRight: '8px' }} />
+                          设备位置选择
+                        </div>
+                        <Row gutter={16}>
+                          <Col span={12}>
+                            <Form.Item
+                              name="roomId"
+                              label={
+                                <span>
+                                  机房
+                                  <span style={{ color: '#ff4d4f', marginLeft: '4px' }}>*</span>
+                                </span>
+                              }
+                              rules={[{ required: true, message: '请选择机房' }]}
+                              style={{ marginBottom: '0' }}
+                            >
+                              <Select
+                                placeholder="请选择机房"
+                                style={{ borderRadius: '8px' }}
+                                showSearch
+                                optionFilterProp="children"
+                                onChange={(value) => {
+                                  setSelectedRoomId(value);
+                                  form.setFieldValue('rackId', undefined);
+                                }}
+                              >
+                                {rooms.map(room => (
+                                  <Option key={room.roomId} value={room.roomId}>
+                                    {room.name}
+                                  </Option>
+                                ))}
+                              </Select>
+                            </Form.Item>
+                          </Col>
+                          <Col span={12}>
+                            <Form.Item
+                              name="rackId"
+                              label={
+                                <span>
+                                  机柜
+                                  <span style={{ color: '#ff4d4f', marginLeft: '4px' }}>*</span>
+                                </span>
+                              }
+                              rules={[{ required: true, message: '请选择机柜' }]}
+                              style={{ marginBottom: '0' }}
+                            >
+                              <Select
+                                placeholder={selectedRoomId ? '请选择机柜' : '请先选择机房'}
+                                style={{ borderRadius: '8px' }}
+                                disabled={!selectedRoomId}
+                                showSearch
+                                optionFilterProp="children"
+                              >
+                                {(selectedRoomId
+                                  ? racks.filter(rack => rack.roomId === selectedRoomId)
+                                  : []
+                                ).map(rack => (
+                                  <Option key={rack.rackId} value={rack.rackId}>
+                                    {rack.name} ({rack.rackId})
+                                  </Option>
+                                ))}
+                              </Select>
+                            </Form.Item>
+                          </Col>
+                        </Row>
+                      </div>
+                    </Col>
+                  </React.Fragment>
+                );
+              } else if (field.fieldType === 'textarea') {
+                // textarea 占整行
+                formItems.push(
+                  <Col span={24} key={field.fieldName}>
+                    <Form.Item
+                      name={field.fieldName}
+                      label={
+                        <span>
+                          {field.displayName}
+                          {field.required && (
+                            <span style={{ color: '#ff4d4f', marginLeft: '4px' }}>*</span>
+                          )}
+                        </span>
+                      }
+                      rules={
+                        field.required
+                          ? [{ required: true, message: `请输入${field.displayName}` }]
+                          : []
+                      }
+                    >
+                      {control}
+                    </Form.Item>
+                  </Col>
+                );
+              } else {
+                // 其他字段两列布局
+                formItems.push(
+                  <Col span={12} key={field.fieldName}>
+                    <Form.Item
+                      name={field.fieldName}
+                      label={
+                        <span>
+                          {field.displayName}
+                          {field.required && (
+                            <span style={{ color: '#ff4d4f', marginLeft: '4px' }}>*</span>
+                          )}
+                        </span>
+                      }
+                      rules={
+                        field.required
+                          ? [{ required: true, message: `请输入${field.displayName}` }]
+                          : []
+                      }
+                    >
+                      {control}
+                    </Form.Item>
+                  </Col>
+                );
+              }
+            });
 
-          <Form.Item style={{ textAlign: 'right', marginTop: '24px' }}>
-            <Space>
-              <Button onClick={handleCancel} style={secondaryActionStyle}>
-                取消
-              </Button>
-              <Button
-                type="primary"
-                htmlType="submit"
-                style={{
-                  height: '40px',
-                  borderRadius: designTokens.borderRadius.small,
-                  background: designTokens.colors.primary.gradient,
-                  border: 'none',
-                  color: '#ffffff',
-                  boxShadow: designTokens.shadows.small,
-                  fontWeight: '500',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                确定
-              </Button>
-            </Space>
-          </Form.Item>
+            return <Row gutter={16}>{formItems}</Row>;
+          })()}
+
+          {/* 底部按钮区域 */}
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: '12px',
+              marginTop: '32px',
+              paddingTop: '24px',
+              borderTop: '1px solid #f0f0f0',
+            }}
+          >
+            <Button
+              onClick={handleCancel}
+              style={{
+                height: '40px',
+                borderRadius: '8px',
+                padding: '0 24px',
+                fontWeight: '500',
+                transition: 'all 0.3s ease',
+              }}
+            >
+              取消
+            </Button>
+            <Button
+              type="primary"
+              htmlType="submit"
+              style={{
+                height: '40px',
+                borderRadius: '8px',
+                background: designTokens.colors.primary.gradient,
+                border: 'none',
+                color: '#ffffff',
+                boxShadow: designTokens.shadows.small,
+                fontWeight: '500',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '0 32px',
+                transition: 'all 0.3s ease',
+              }}
+            >
+              确定
+            </Button>
+          </div>
         </Form>
       </Modal>
 
@@ -1762,29 +1958,46 @@ function DeviceManagement() {
         <Form
           layout="vertical"
           onFinish={handleSaveFieldConfig}
-          initialValues={deviceFields.reduce(
-            (acc, field) => ({
-              ...acc,
-              [field.fieldName]: field.visible,
-            }),
-            {}
-          )}
+          initialValues={{
+            ...deviceFields.reduce(
+              (acc, field) => ({
+                ...acc,
+                [`visible_${field.fieldName}`]: field.visible,
+                [`required_${field.fieldName}`]: field.required,
+              }),
+              {}
+            ),
+          }}
         >
           <div style={{ maxHeight: 400, overflowY: 'auto' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
-              {deviceFields
-                .filter(field => field.fieldName !== 'deviceId')
-                .map(field => (
-                  <Form.Item
-                    key={field.fieldName}
-                    name={field.fieldName}
-                    valuePropName="checked"
-                    noStyle
-                  >
-                    <Checkbox style={{ marginBottom: '8px' }}>{field.displayName}</Checkbox>
-                  </Form.Item>
-                ))}
-            </div>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
+                  <th style={{ padding: '8px', textAlign: 'left', width: '40%' }}>字段名称</th>
+                  <th style={{ padding: '8px', textAlign: 'center', width: '30%' }}>可见</th>
+                  <th style={{ padding: '8px', textAlign: 'center', width: '30%' }}>必填</th>
+                </tr>
+              </thead>
+              <tbody>
+                {deviceFields
+                  .filter(field => field.fieldName !== 'deviceId')
+                  .map(field => (
+                    <tr key={field.fieldName} style={{ borderBottom: '1px solid #f0f0f0' }}>
+                      <td style={{ padding: '8px' }}>{field.displayName}</td>
+                      <td style={{ padding: '8px', textAlign: 'center' }}>
+                        <Form.Item name={`visible_${field.fieldName}`} valuePropName="checked" noStyle>
+                          <Switch size="small" />
+                        </Form.Item>
+                      </td>
+                      <td style={{ padding: '8px', textAlign: 'center' }}>
+                        <Form.Item name={`required_${field.fieldName}`} valuePropName="checked" noStyle>
+                          <Switch size="small" />
+                        </Form.Item>
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
           </div>
 
           <Form.Item style={{ textAlign: 'right', marginTop: '20px' }}>

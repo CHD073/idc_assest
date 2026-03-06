@@ -64,6 +64,21 @@ const migrations = [
     name: '耗材SN序列号字段',
     description: '为 consumables、consumable_records、consumable_logs 添加 snList 字段',
     migrate: migrateSnList
+  },
+  {
+    name: '设备型号字段可空',
+    description: '将 devices 表 model 字段改为可空，支持非必填',
+    migrate: migrateDeviceModelField
+  },
+  {
+    name: '设备字段配置同步',
+    description: '同步前后端字段必填配置',
+    migrate: migrateDeviceFieldsConfig
+  },
+  {
+    name: '设备表字段可空',
+    description: '将设备表所有字段改为可空，由应用层验证控制',
+    migrate: migrateDeviceFieldsNullable
   }
 ];
 
@@ -388,6 +403,149 @@ async function migrateSnList() {
       await addColumnIfNotExists(table, 'snList', columnDef);
     } else {
       console.log(`    ${table} 表不存在，跳过`);
+    }
+  }
+}
+
+async function migrateDeviceModelField() {
+  if (!(await tableExists('devices'))) {
+    console.log('    devices 表不存在，跳过');
+    return;
+  }
+
+  const dialect = sequelize.getDialect();
+  
+  if (dialect === 'mysql') {
+    await sequelize.query(
+      'ALTER TABLE devices MODIFY COLUMN model VARCHAR(255) NULL'
+    );
+    console.log('    devices 表 model 字段已改为可空');
+  } else if (dialect === 'sqlite') {
+    const columns = await getTableColumns('devices');
+    if (columns.includes('model_old')) {
+      console.log('    model_old 字段已存在，跳过迁移');
+      return;
+    }
+    
+    await sequelize.query('ALTER TABLE devices RENAME COLUMN model TO model_old');
+    await sequelize.query('ALTER TABLE devices ADD COLUMN model VARCHAR(255)');
+    await sequelize.query('UPDATE devices SET model = model_old');
+    await sequelize.query('ALTER TABLE devices DROP COLUMN model_old');
+    console.log('    devices 表 model 字段已改为可空');
+  }
+}
+
+async function migrateDeviceFieldsConfig() {
+  const DeviceField = require('../models/DeviceField');
+  
+  const updates = [
+    { fieldName: 'model', required: false },
+    { fieldName: 'powerConsumption', required: true },
+    { fieldName: 'purchaseDate', required: false },
+    { fieldName: 'warrantyExpiry', required: false },
+  ];
+  
+  for (const update of updates) {
+    const field = await DeviceField.findOne({ where: { fieldName: update.fieldName } });
+    if (field && field.required !== update.required) {
+      await field.update(update);
+      console.log(`    更新字段 ${update.fieldName}: required=${update.required}`);
+    } else if (!field) {
+      console.log(`    字段 ${update.fieldName} 不存在，跳过`);
+    } else {
+      console.log(`    字段 ${update.fieldName} 配置已正确，跳过`);
+    }
+  }
+}
+
+async function migrateDeviceFieldsNullable() {
+  const dialect = sequelize.getDialect();
+  
+  if (dialect === 'mysql') {
+    const alterCommands = [
+      "ALTER TABLE devices MODIFY COLUMN name VARCHAR(255) NULL",
+      "ALTER TABLE devices MODIFY COLUMN type VARCHAR(255) NULL",
+      "ALTER TABLE devices MODIFY COLUMN model VARCHAR(255) NULL",
+      "ALTER TABLE devices MODIFY COLUMN serialNumber VARCHAR(255) NULL",
+      "ALTER TABLE devices MODIFY COLUMN rackId VARCHAR(255) NULL",
+      "ALTER TABLE devices MODIFY COLUMN position INTEGER NULL",
+      "ALTER TABLE devices MODIFY COLUMN height INTEGER NULL",
+      "ALTER TABLE devices MODIFY COLUMN powerConsumption FLOAT NULL",
+      "ALTER TABLE devices MODIFY COLUMN customFields JSON NULL"
+    ];
+    
+    for (const sql of alterCommands) {
+      try {
+        await sequelize.query(sql);
+      } catch (e) {
+        if (!e.message.includes('Unknown column')) {
+          console.log(`    警告: ${e.message}`);
+        }
+      }
+    }
+    console.log('    devices 表字段已改为可空');
+    
+  } else if (dialect === 'sqlite') {
+    const columns = await getTableColumns('devices');
+    const hasNullableFlag = columns.includes('_nullable_migration_done');
+    
+    if (hasNullableFlag) {
+      console.log('    已完成可空迁移，跳过');
+      return;
+    }
+    
+    await sequelize.query('PRAGMA foreign_keys = OFF');
+    
+    try {
+      await sequelize.query('DROP TABLE IF EXISTS devices_new');
+      
+      await sequelize.query(`
+        CREATE TABLE devices_new (
+          deviceId VARCHAR(255) PRIMARY KEY NOT NULL UNIQUE,
+          name VARCHAR(255),
+          type VARCHAR(255),
+          model VARCHAR(255),
+          serialNumber VARCHAR(255) UNIQUE,
+          rackId VARCHAR(255),
+          position INTEGER,
+          height INTEGER DEFAULT 1,
+          powerConsumption FLOAT DEFAULT 0,
+          status VARCHAR(255) DEFAULT 'offline',
+          purchaseDate DATETIME,
+          warrantyExpiry DATETIME,
+          ipAddress VARCHAR(255),
+          description TEXT,
+          customFields JSON DEFAULT '{}',
+          createdAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          updatedAt DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          _nullable_migration_done INTEGER DEFAULT 1
+        )
+      `);
+      
+      await sequelize.query(`
+        INSERT INTO devices_new (
+          deviceId, name, type, model, serialNumber, rackId, position, height,
+          powerConsumption, status, purchaseDate, warrantyExpiry, ipAddress,
+          description, customFields, createdAt, updatedAt
+        )
+        SELECT 
+          deviceId, name, type, model, serialNumber, rackId, position, height,
+          powerConsumption, status, purchaseDate, warrantyExpiry, ipAddress,
+          description, customFields, createdAt, updatedAt
+        FROM devices
+      `);
+      
+      await sequelize.query('DROP TABLE devices');
+      await sequelize.query('ALTER TABLE devices_new RENAME TO devices');
+      
+      await sequelize.query('CREATE INDEX IF NOT EXISTS idx_devices_status ON devices(status)');
+      await sequelize.query('CREATE INDEX IF NOT EXISTS idx_devices_type ON devices(type)');
+      await sequelize.query('CREATE INDEX IF NOT EXISTS idx_devices_rackId ON devices(rackId)');
+      await sequelize.query('CREATE INDEX IF NOT EXISTS idx_devices_name ON devices(name)');
+      
+      console.log('    devices 表字段已改为可空');
+    } finally {
+      await sequelize.query('PRAGMA foreign_keys = ON');
     }
   }
 }

@@ -1,13 +1,10 @@
 const Joi = require('joi');
+const DeviceField = require('../models/DeviceField');
 
-// 设备类型枚举
 const DEVICE_TYPES = ['server', 'switch', 'router', 'storage', 'other'];
-
-// 设备状态枚举
 const DEVICE_STATUS = ['running', 'maintenance', 'offline', 'fault'];
 
-// 创建设备验证Schema
-const createDeviceSchema = Joi.object({
+const baseFieldSchemas = {
   deviceId: Joi.string()
     .max(50)
     .pattern(/^[a-zA-Z0-9_-]+$/)
@@ -18,21 +15,17 @@ const createDeviceSchema = Joi.object({
     }),
 
   name: Joi.string()
-    .required()
     .max(100)
     .messages({
       'string.empty': '设备名称不能为空',
-      'string.max': '设备名称不能超过100个字符',
-      'any.required': '设备名称是必填字段'
+      'string.max': '设备名称不能超过100个字符'
     }),
 
   type: Joi.string()
     .valid(...DEVICE_TYPES)
-    .required()
     .messages({
       'string.empty': '设备类型不能为空',
-      'any.only': `设备类型必须是以下之一: ${DEVICE_TYPES.join(', ')}`,
-      'any.required': '设备类型是必填字段'
+      'any.only': `设备类型必须是以下之一: ${DEVICE_TYPES.join(', ')}`
     }),
 
   model: Joi.string()
@@ -44,137 +37,17 @@ const createDeviceSchema = Joi.object({
 
   serialNumber: Joi.string()
     .max(100)
-    .allow('', null)
     .messages({
+      'string.empty': '序列号不能为空',
       'string.max': '序列号不能超过100个字符'
     }),
 
   rackId: Joi.string()
-    .required()
     .max(50)
     .messages({
       'string.empty': '机柜ID不能为空',
-      'string.max': '机柜ID不能超过50个字符',
-      'any.required': '机柜ID是必填字段'
+      'string.max': '机柜ID不能超过50个字符'
     }),
-
-  position: Joi.number()
-    .integer()
-    .min(1)
-    .max(100)
-    .required()
-    .messages({
-      'number.base': '位置必须是数字',
-      'number.integer': '位置必须是整数',
-      'number.min': '位置不能小于1',
-      'number.max': '位置不能大于100',
-      'any.required': '位置是必填字段'
-    }),
-
-  height: Joi.number()
-    .integer()
-    .min(1)
-    .max(50)
-    .required()
-    .messages({
-      'number.base': '高度必须是数字',
-      'number.integer': '高度必须是整数',
-      'number.min': '高度不能小于1',
-      'number.max': '高度不能大于50',
-      'any.required': '高度是必填字段'
-    }),
-
-  powerConsumption: Joi.number()
-    .min(0)
-    .max(100000)
-    .default(0)
-    .messages({
-      'number.base': '功率必须是数字',
-      'number.min': '功率不能小于0',
-      'number.max': '功率不能超过100000'
-    }),
-
-  ipAddress: Joi.string()
-    .ip({ version: ['ipv4', 'ipv6'] })
-    .allow('', null)
-    .messages({
-      'string.ip': 'IP地址格式无效'
-    }),
-
-  status: Joi.string()
-    .valid(...DEVICE_STATUS)
-    .default('offline')
-    .messages({
-      'any.only': `状态必须是以下之一: ${DEVICE_STATUS.join(', ')}`
-    }),
-
-  purchaseDate: Joi.date()
-    .allow(null)
-    .messages({
-      'date.base': '购买日期格式无效'
-    }),
-
-  warrantyExpiry: Joi.date()
-    .allow(null)
-    .messages({
-      'date.base': '保修到期日期格式无效'
-    }),
-
-  description: Joi.string()
-    .max(500)
-    .allow('', null)
-    .messages({
-      'string.max': '描述不能超过500个字符'
-    }),
-
-  customFields: Joi.object()
-    .allow(null)
-}).custom((value, helpers) => {
-  // 验证保修日期必须晚于购买日期
-  if (value.purchaseDate && value.warrantyExpiry) {
-    const purchase = new Date(value.purchaseDate);
-    const warranty = new Date(value.warrantyExpiry);
-    if (warranty <= purchase) {
-      return helpers.error('date.warrantyAfterPurchase');
-    }
-  }
-  return value;
-}).messages({
-  'date.warrantyAfterPurchase': '保修到期日期必须晚于购买日期'
-});
-
-// 更新设备验证Schema（所有字段可选）
-const updateDeviceSchema = Joi.object({
-  deviceId: Joi.string()
-    .max(50)
-    .pattern(/^[a-zA-Z0-9_-]+$/)
-    .messages({
-      'string.max': '设备ID不能超过50个字符',
-      'string.pattern.base': '设备ID只能包含字母、数字、下划线和横线'
-    }),
-
-  name: Joi.string()
-    .max(100)
-    .messages({
-      'string.max': '设备名称不能超过100个字符'
-    }),
-
-  type: Joi.string()
-    .valid(...DEVICE_TYPES)
-    .messages({
-      'any.only': `设备类型必须是以下之一: ${DEVICE_TYPES.join(', ')}`
-    }),
-
-  model: Joi.string()
-    .max(100)
-    .allow('', null),
-
-  serialNumber: Joi.string()
-    .max(100)
-    .allow('', null),
-
-  rackId: Joi.string()
-    .max(50),
 
   position: Joi.number()
     .integer()
@@ -216,27 +89,81 @@ const updateDeviceSchema = Joi.object({
 
   status: Joi.string()
     .valid(...DEVICE_STATUS)
+    .default('offline')
     .messages({
       'any.only': `状态必须是以下之一: ${DEVICE_STATUS.join(', ')}`
     }),
 
   purchaseDate: Joi.date()
-    .allow(null),
+    .allow(null)
+    .messages({
+      'date.base': '购买日期格式无效'
+    }),
 
   warrantyExpiry: Joi.date()
-    .allow(null),
+    .allow(null)
+    .messages({
+      'date.base': '保修到期日期格式无效'
+    }),
 
   description: Joi.string()
     .max(500)
-    .allow('', null),
+    .allow('', null)
+    .messages({
+      'string.max': '描述不能超过500个字符'
+    }),
 
-  customFields: Joi.object()
-    .allow(null)
-}).min(1).messages({
-  'object.min': '至少需要提供一个字段进行更新'
-});
+  customFields: Joi.object().allow(null)
+};
 
-// 批量操作验证Schema
+async function buildDynamicSchema(isCreate = true) {
+  const fields = await DeviceField.findAll({
+    where: { isSystem: true },
+    order: [['order', 'ASC']]
+  });
+
+  const schemaObj = {};
+
+  fields.forEach(field => {
+    const baseSchema = baseFieldSchemas[field.fieldName];
+    if (baseSchema) {
+      let fieldSchema = baseSchema.clone();
+      
+      if (field.required && isCreate) {
+        fieldSchema = fieldSchema.required();
+      }
+      
+      schemaObj[field.fieldName] = fieldSchema;
+    }
+  });
+
+  schemaObj.customFields = baseFieldSchemas.customFields;
+
+  return Joi.object(schemaObj).custom((value, helpers) => {
+    if (value.purchaseDate && value.warrantyExpiry) {
+      const purchase = new Date(value.purchaseDate);
+      const warranty = new Date(value.warrantyExpiry);
+      if (warranty <= purchase) {
+        return helpers.error('date.warrantyAfterPurchase');
+      }
+    }
+    return value;
+  }).messages({
+    'date.warrantyAfterPurchase': '保修到期日期必须晚于购买日期'
+  });
+}
+
+async function getCreateDeviceSchema() {
+  return buildDynamicSchema(true);
+}
+
+async function getUpdateDeviceSchema() {
+  const schema = await buildDynamicSchema(false);
+  return schema.min(1).messages({
+    'object.min': '至少需要提供一个字段进行更新'
+  });
+}
+
 const batchDeviceIdsSchema = Joi.object({
   deviceIds: Joi.array()
     .items(Joi.string().required())
@@ -249,7 +176,6 @@ const batchDeviceIdsSchema = Joi.object({
     })
 });
 
-// 批量状态变更验证Schema
 const batchStatusSchema = Joi.object({
   deviceIds: Joi.array()
     .items(Joi.string().required())
@@ -269,7 +195,6 @@ const batchStatusSchema = Joi.object({
     })
 });
 
-// 批量移动验证Schema
 const batchMoveSchema = Joi.object({
   deviceIds: Joi.array()
     .items(Joi.string().required())
@@ -288,7 +213,6 @@ const batchMoveSchema = Joi.object({
     .allow(null)
 });
 
-// 查询参数验证Schema
 const queryDeviceSchema = Joi.object({
   keyword: Joi.string()
     .max(100)
@@ -313,6 +237,20 @@ const queryDeviceSchema = Joi.object({
     .default(10)
 });
 
+const createDeviceSchema = {
+  validate: async (data, options = {}) => {
+    const schema = await getCreateDeviceSchema();
+    return schema.validate(data, options);
+  }
+};
+
+const updateDeviceSchema = {
+  validate: async (data, options = {}) => {
+    const schema = await getUpdateDeviceSchema();
+    return schema.validate(data, options);
+  }
+};
+
 module.exports = {
   createDeviceSchema,
   updateDeviceSchema,
@@ -321,5 +259,7 @@ module.exports = {
   batchMoveSchema,
   queryDeviceSchema,
   DEVICE_TYPES,
-  DEVICE_STATUS
+  DEVICE_STATUS,
+  getCreateDeviceSchema,
+  getUpdateDeviceSchema
 };

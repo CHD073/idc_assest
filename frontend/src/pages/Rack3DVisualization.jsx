@@ -241,7 +241,7 @@ const Rack3DVisualization = () => {
     if (!rackId) return;
     try {
       setLoadingDevices(true);
-      const response = await axios.get(`/api/devices?rackId=${rackId}`);
+      const response = await axios.get(`/api/devices?rackId=${rackId}&pageSize=100`);
 
       let devicesData = [];
       if (Array.isArray(response.data)) {

@@ -202,7 +202,7 @@ const RackModel = ({
 
           return (
             <LODManager
-              key={device.id}
+              key={device.deviceId || device.id}
               device={device}
               uHeight={uHeight}
               rackDepth={depth}
@@ -216,7 +216,7 @@ const RackModel = ({
                 uHeight={uHeight}
                 rackDepth={depth}
                 position={[0, 0, 0]}
-                isSelected={selectedDeviceId === device.id}
+                isSelected={selectedDeviceId === (device.deviceId || device.id)}
                 onClick={onDeviceClick}
                 onPointerOver={onDeviceHover}
                 onPointerOut={onDeviceLeave}

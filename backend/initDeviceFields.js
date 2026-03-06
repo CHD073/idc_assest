@@ -87,7 +87,7 @@ const defaultDeviceFields = [
     fieldName: 'powerConsumption',
     displayName: '功率(W)',
     fieldType: 'number',
-    required: false,
+    required: true,
     order: 9,
     visible: true,
     isSystem: true

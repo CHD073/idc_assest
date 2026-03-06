@@ -88,33 +88,29 @@ router.post('/config', async (req, res) => {
   try {
     const fieldConfigs = req.body;
     
-    // 验证输入
     if (!Array.isArray(fieldConfigs)) {
       return res.status(400).json({ error: '输入必须是数组' });
     }
     
-    // 批量更新字段配置
     const updatedFields = [];
     for (const config of fieldConfigs) {
-      // 检查字段是否存在
       const existingField = await DeviceField.findOne({ where: { fieldName: config.fieldName } });
       
       if (existingField) {
-        // 更新现有字段
         await existingField.update({ 
-            visible: config.visible,
-            displayName: config.displayName // 同时更新显示名称，以防变化
+          visible: config.visible !== undefined ? config.visible : existingField.visible,
+          required: config.required !== undefined ? config.required : existingField.required,
+          displayName: config.displayName || existingField.displayName,
         });
         updatedFields.push(existingField);
       } else {
-        // 创建新字段
         const newField = await DeviceField.create({
-            fieldName: config.fieldName,
-            visible: config.visible,
-            displayName: config.displayName,
-            fieldType: config.fieldType || 'text',
-            required: false, // 默认为非必填
-            order: 0 // 默认顺序
+          fieldName: config.fieldName,
+          visible: config.visible !== undefined ? config.visible : true,
+          required: config.required !== undefined ? config.required : false,
+          displayName: config.displayName || config.fieldName,
+          fieldType: config.fieldType || 'text',
+          order: config.order || 0,
         });
         updatedFields.push(newField);
       }

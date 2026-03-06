@@ -11,24 +11,24 @@ const Device = sequelize.define('Device', {
   },
   name: {
     type: DataTypes.STRING,
-    allowNull: false
+    allowNull: true
   },
   type: {
     type: DataTypes.STRING,
-    allowNull: false
+    allowNull: true
   },
   model: {
     type: DataTypes.STRING,
-    allowNull: false
+    allowNull: true
   },
   serialNumber: {
     type: DataTypes.STRING,
-    allowNull: false,
+    allowNull: true,
     unique: true
   },
   rackId: {
     type: DataTypes.STRING,
-    allowNull: false,
+    allowNull: true,
     references: {
       model: Rack,
       key: 'rackId'
@@ -36,20 +36,21 @@ const Device = sequelize.define('Device', {
   },
   position: {
     type: DataTypes.INTEGER,
-    allowNull: false // 设备在机柜中的位置（U数）
+    allowNull: true
   },
   height: {
     type: DataTypes.INTEGER,
-    allowNull: false,
-    defaultValue: 1 // 设备高度（U数）
+    allowNull: true,
+    defaultValue: 1
   },
   powerConsumption: {
     type: DataTypes.FLOAT,
-    allowNull: false
+    allowNull: true,
+    defaultValue: 0
   },
   status: {
     type: DataTypes.STRING,
-    defaultValue: 'running'
+    defaultValue: 'offline'
   },
   purchaseDate: {
     type: DataTypes.DATE,
@@ -60,15 +61,17 @@ const Device = sequelize.define('Device', {
     allowNull: true
   },
   ipAddress: {
-    type: DataTypes.STRING
+    type: DataTypes.STRING,
+    allowNull: true
   },
   description: {
-    type: DataTypes.TEXT
+    type: DataTypes.TEXT,
+    allowNull: true
   },
   customFields: {
     type: DataTypes.JSON,
     defaultValue: {},
-    allowNull: false
+    allowNull: true
   }
 }, {
   tableName: 'devices',
@@ -83,7 +86,6 @@ const Device = sequelize.define('Device', {
   ]
 });
 
-// 关联关系
 Device.belongsTo(Rack, { foreignKey: 'rackId' });
 Rack.hasMany(Device, { foreignKey: 'rackId' });
 

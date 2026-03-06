@@ -133,8 +133,8 @@ const ProtectedRoute = ({ component: Component }) => (
 
 // 默认空闲超时配置
 const DEFAULT_IDLE_CONFIG = {
-  timeout: 10 * 60 * 1000, // 10分钟
-  warningTime: 30 * 1000, // 30秒
+  timeout: 30 * 60 * 1000, // 30分钟
+  warningTime: 60 * 1000, // 60秒
 };
 
 const AppLayout = ({ children }) => {
