@@ -30,6 +30,7 @@ import {
   ScanOutlined,
   CheckOutlined,
   CloseOutlined,
+  PlusOutlined,
 } from '@ant-design/icons';
 import axios from 'axios';
 import dayjs from 'dayjs';
@@ -67,6 +68,12 @@ const InventoryTaskExecution = () => {
   const [scanResult, setScanResult] = useState(null);
   const [scanModalVisible, setScanModalVisible] = useState(false);
   const [recordPagination, setRecordPagination] = useState({ current: 1, pageSize: 20, total: 0 });
+  const [quickAddModalVisible, setQuickAddModalVisible] = useState(false);
+  const [quickAddForm] = Form.useForm();
+  const [quickAddLoading, setQuickAddLoading] = useState(false);
+  const [rooms, setRooms] = useState([]);
+  const [racks, setRacks] = useState([]);
+  const [selectedRoomId, setSelectedRoomId] = useState(null);
 
   const planId = searchParams.get('planId');
 
@@ -244,6 +251,84 @@ const InventoryTaskExecution = () => {
   useEffect(() => {
     fetchPlan();
   }, [fetchPlan]);
+
+  const fetchRooms = async () => {
+    try {
+      const res = await api.get('/rooms');
+      setRooms(res.data.rooms || res.data || []);
+    } catch (error) {
+      console.error('获取机房列表失败', error);
+    }
+  };
+
+  const fetchRacks = async () => {
+    try {
+      const res = await api.get('/racks');
+      setRacks(res.data.racks || res.data || []);
+    } catch (error) {
+      console.error('获取机柜列表失败', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchRooms();
+    fetchRacks();
+  }, []);
+
+  const filteredRacks = selectedRoomId 
+    ? racks.filter(rack => rack.roomId === selectedRoomId)
+    : racks;
+
+  const handleQuickAddDevice = async (values) => {
+    if (!currentTask || !plan) {
+      message.error('请先选择盘点任务');
+      return;
+    }
+    setQuickAddLoading(true);
+    try {
+      const res = await api.post('/inventory/quick-add-device', {
+        taskId: currentTask.taskId,
+        planId: plan.planId,
+        serialNumber: scanResult?.sn || values.serialNumber,
+        deviceName: values.deviceName,
+        deviceType: values.deviceType,
+        rackId: values.rackId,
+        position: values.position,
+        remark: values.remark
+      });
+      message.success('设备添加成功！');
+      setQuickAddModalVisible(false);
+      quickAddForm.resetFields();
+      setScanResult({
+        success: true,
+        message: `新设备 "${res.data.device.name}" 已添加并完成盘点！`,
+        record: res.data.record,
+        sn: res.data.device.serialNumber
+      });
+      if (currentTask) {
+        fetchTaskRecords(currentTask.taskId);
+      }
+      fetchPlan();
+    } catch (error) {
+      message.error(error.response?.data?.error || '添加设备失败');
+    } finally {
+      setQuickAddLoading(false);
+    }
+  };
+
+  const openQuickAddModal = () => {
+    setSelectedRoomId(null);
+    quickAddForm.setFieldsValue({
+      serialNumber: scanResult?.sn || '',
+      deviceName: '',
+      deviceType: 'other',
+      roomId: undefined,
+      rackId: undefined,
+      position: undefined,
+      remark: undefined,
+    });
+    setQuickAddModalVisible(true);
+  };
 
   const handleCheck = (record) => {
     setCurrentRecord(record);
@@ -912,6 +997,18 @@ const InventoryTaskExecution = () => {
                   </Row>
                 </div>
               )}
+              {!scanResult.success && scanResult.sn && (
+                <div style={{ textAlign: 'center', marginTop: 16 }}>
+                  <Button
+                    type="primary"
+                    icon={<PlusOutlined />}
+                    onClick={openQuickAddModal}
+                    style={{ borderRadius: 8 }}
+                  >
+                    快速添加此设备
+                  </Button>
+                </div>
+              )}
             </div>
           )}
 
@@ -1036,6 +1133,130 @@ const InventoryTaskExecution = () => {
             </Form.Item>
           </Form>
         )}
+      </Modal>
+
+      <Modal
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <PlusOutlined style={{ fontSize: 18, color: '#1890ff' }} />
+            <span>快速添加设备</span>
+          </div>
+        }
+        open={quickAddModalVisible}
+        onCancel={() => {
+          setQuickAddModalVisible(false);
+          setSelectedRoomId(null);
+        }}
+        footer={null}
+        width={500}
+        centered
+      >
+        <Form
+          form={quickAddForm}
+          layout="vertical"
+          onFinish={handleQuickAddDevice}
+        >
+          <Form.Item
+            name="serialNumber"
+            label="序列号"
+            rules={[{ required: true, message: '请输入序列号' }]}
+          >
+            <Input placeholder="请输入设备序列号" disabled />
+          </Form.Item>
+
+          <Form.Item
+            name="deviceName"
+            label="设备名称"
+          >
+            <Input placeholder="请输入设备名称（可选）" />
+          </Form.Item>
+
+          <Form.Item
+            name="deviceType"
+            label="设备类型"
+            initialValue="other"
+          >
+            <Select placeholder="请选择设备类型">
+              <Select.Option value="server">服务器</Select.Option>
+              <Select.Option value="switch">交换机</Select.Option>
+              <Select.Option value="router">路由器</Select.Option>
+              <Select.Option value="storage">存储设备</Select.Option>
+              <Select.Option value="other">其他</Select.Option>
+            </Select>
+          </Form.Item>
+
+          <Row gutter={16}>
+            <Col span={12}>
+              <Form.Item
+                name="roomId"
+                label="所属机房"
+              >
+                <Select 
+                  placeholder="请选择机房" 
+                  allowClear 
+                  showSearch 
+                  optionFilterProp="children"
+                  onChange={(value) => {
+                    setSelectedRoomId(value);
+                    quickAddForm.setFieldsValue({ rackId: undefined });
+                  }}
+                >
+                  {rooms.map(room => (
+                    <Select.Option key={room.roomId} value={room.roomId}>
+                      {room.name}
+                    </Select.Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </Col>
+            <Col span={12}>
+              <Form.Item
+                name="rackId"
+                label="所属机柜"
+              >
+                <Select 
+                  placeholder={selectedRoomId ? "请选择机柜" : "请先选择机房"} 
+                  allowClear 
+                  showSearch 
+                  optionFilterProp="children"
+                  disabled={!selectedRoomId}
+                >
+                  {filteredRacks.map(rack => (
+                    <Select.Option key={rack.rackId} value={rack.rackId}>
+                      {rack.name}
+                    </Select.Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Form.Item
+            name="position"
+            label="U位"
+          >
+            <Input type="number" placeholder="请输入U位（可选）" min={1} />
+          </Form.Item>
+
+          <Form.Item
+            name="remark"
+            label="备注"
+          >
+            <Input.TextArea rows={2} placeholder="请输入备注（可选）" />
+          </Form.Item>
+
+          <Form.Item style={{ marginBottom: 0, textAlign: 'right' }}>
+            <Space>
+              <Button onClick={() => {
+                setQuickAddModalVisible(false);
+                setSelectedRoomId(null);
+              }}>取消</Button>
+              <Button type="primary" htmlType="submit" loading={quickAddLoading}>
+                添加设备
+              </Button>
+            </Space>
+          </Form.Item>
+        </Form>
       </Modal>
     </div>
   );

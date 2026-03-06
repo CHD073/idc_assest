@@ -19,6 +19,7 @@ import {
   Badge,
   Tooltip,
   Avatar,
+  ColorPicker,
 } from 'antd';
 import {
   SettingOutlined,
@@ -668,18 +669,360 @@ const SystemSettings = () => {
     );
   };
 
+  const presetColors = [
+    '#667eea',
+    '#764ba2',
+    '#f093fb',
+    '#4facfe',
+    '#43e97b',
+    '#fa709a',
+    '#fee140',
+    '#00b4db',
+    '#0083b0',
+    '#fcb045',
+    '#1890ff',
+    '#52c41a',
+    '#eb2f96',
+    '#722ed1',
+    '#13c2c2',
+    '#fa8c16',
+  ];
+
+  const handleColorChange = (color, key) => {
+    const hexColor = typeof color === 'string' ? color : color.toHexString();
+    form.setFieldValue(key, hexColor);
+    
+    const root = document.documentElement;
+    if (key === 'primary_color') {
+      root.style.setProperty('--primary-color', hexColor);
+      root.style.setProperty('--primary-light', `${hexColor}20`);
+    } else if (key === 'secondary_color') {
+      root.style.setProperty('--secondary-color', hexColor);
+      root.style.setProperty('--secondary-light', `${hexColor}20`);
+    }
+  };
+
+  const renderColorFormItem = (key, data) => {
+    const currentValue = form.getFieldValue(key) || settings[key]?.value || '#667eea';
+    
+    return (
+      <Form.Item 
+        key={key} 
+        label={
+          <Space>
+            <span style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>
+              {data.description || key}
+            </span>
+            <div 
+              style={{ 
+                width: 20, 
+                height: 20, 
+                borderRadius: 4, 
+                backgroundColor: currentValue,
+                border: '1px solid #d9d9d9',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.1)'
+              }} 
+            />
+          </Space>
+        } 
+        name={key}
+        style={{ marginBottom: 0 }}
+      >
+        <Input type="hidden" />
+      </Form.Item>
+    );
+  };
+
   const renderAppearanceSettings = () => {
+    const primaryColor = form.getFieldValue('primary_color') || settings.primary_color?.value || '#667eea';
+    const secondaryColor = form.getFieldValue('secondary_color') || settings.secondary_color?.value || '#764ba2';
+
     return (
       <Form form={form} layout="vertical" onFinish={handleSaveSettings}>
         <div style={{ paddingBottom: 80 }}>
           <Alert
             message="主题颜色设置"
-            description="修改主题颜色后需要刷新页面才能生效。建议选择对比度适中的颜色组合。"
+            description="选择颜色后可实时预览效果，保存设置后永久生效。建议选择对比度适中的颜色组合。"
             type="info"
             showIcon
             style={{ marginBottom: 24, borderRadius: 12 }}
           />
-          {settingGroups.appearance.map(group => renderSettingGroup(group))}
+          
+          <Card
+            style={{
+              marginBottom: 24,
+              borderRadius: 12,
+              border: '1px solid #e8e8e8',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+            }}
+            bodyStyle={{ padding: '24px' }}
+          >
+            <div style={{ textAlign: 'center', marginBottom: 24 }}>
+              <div style={{ 
+                width: 48, 
+                height: 48, 
+                borderRadius: '50%', 
+                background: `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: 12,
+              }}>
+                <BgColorsOutlined style={{ color: '#fff', fontSize: 24 }} />
+              </div>
+              <div style={{ fontSize: 18, fontWeight: 600, color: '#262626', marginBottom: 6 }}>
+                主题颜色
+              </div>
+              <div style={{ fontSize: 14, color: '#666' }}>
+                自定义系统主题配色方案
+              </div>
+            </div>
+
+            <Divider style={{ margin: '0 0 24px 0' }} />
+
+            <Row gutter={[32, 24]}>
+              <Col xs={24} md={12}>
+                <div style={{ marginBottom: 8 }}>
+                  <Text strong style={{ fontSize: 14, color: '#262626' }}>主色调</Text>
+                  <Text type="secondary" style={{ fontSize: 12, marginLeft: 8 }}>
+                    用于按钮、链接等主要交互元素
+                  </Text>
+                </div>
+                <Space direction="vertical" style={{ width: '100%' }}>
+                  <ColorPicker
+                    value={primaryColor}
+                    onChange={(color) => handleColorChange(color, 'primary_color')}
+                    format="hex"
+                    showText
+                    presets={[
+                      {
+                        label: '推荐配色',
+                        colors: presetColors,
+                      },
+                    ]}
+                    style={{ width: '100%' }}
+                  />
+                  <Input 
+                    value={primaryColor}
+                    onChange={(e) => handleColorChange(e.target.value, 'primary_color')}
+                    placeholder="#667eea"
+                    style={{ borderRadius: 8 }}
+                    prefix={<BgColorsOutlined style={{ color: '#bfbfbf' }} />}
+                  />
+                </Space>
+              </Col>
+              <Col xs={24} md={12}>
+                <div style={{ marginBottom: 8 }}>
+                  <Text strong style={{ fontSize: 14, color: '#262626' }}>次色调</Text>
+                  <Text type="secondary" style={{ fontSize: 12, marginLeft: 8 }}>
+                    用于渐变、悬停效果等辅助元素
+                  </Text>
+                </div>
+                <Space direction="vertical" style={{ width: '100%' }}>
+                  <ColorPicker
+                    value={secondaryColor}
+                    onChange={(color) => handleColorChange(color, 'secondary_color')}
+                    format="hex"
+                    showText
+                    presets={[
+                      {
+                        label: '推荐配色',
+                        colors: presetColors,
+                      },
+                    ]}
+                    style={{ width: '100%' }}
+                  />
+                  <Input 
+                    value={secondaryColor}
+                    onChange={(e) => handleColorChange(e.target.value, 'secondary_color')}
+                    placeholder="#764ba2"
+                    style={{ borderRadius: 8 }}
+                    prefix={<BgColorsOutlined style={{ color: '#bfbfbf' }} />}
+                  />
+                </Space>
+              </Col>
+            </Row>
+
+            <Divider style={{ margin: '24px 0' }} />
+
+            <div style={{ 
+              padding: 16, 
+              background: '#fafafa', 
+              borderRadius: 8,
+              border: '1px solid #f0f0f0'
+            }}>
+              <Text strong style={{ fontSize: 13, color: '#595959', marginBottom: 12, display: 'block' }}>
+                实时预览
+              </Text>
+              <Space size="middle" wrap>
+                <Button 
+                  type="primary" 
+                  style={{ 
+                    background: `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`,
+                    border: 'none'
+                  }}
+                >
+                  主要按钮
+                </Button>
+                <Button 
+                  style={{ 
+                    borderColor: primaryColor,
+                    color: primaryColor
+                  }}
+                >
+                  次要按钮
+                </Button>
+                <Tag 
+                  color={primaryColor}
+                  style={{ borderRadius: 4 }}
+                >
+                  标签样式
+                </Tag>
+                <div 
+                  style={{ 
+                    width: 60, 
+                    height: 24, 
+                    borderRadius: 4,
+                    background: `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`,
+                  }} 
+                />
+              </Space>
+            </div>
+          </Card>
+
+          <Card
+            style={{
+              marginBottom: 24,
+              borderRadius: 12,
+              border: '1px solid #e8e8e8',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+            }}
+            bodyStyle={{ padding: '24px' }}
+          >
+            <div style={{ textAlign: 'center', marginBottom: 24 }}>
+              <div style={{ 
+                width: 48, 
+                height: 48, 
+                borderRadius: '50%', 
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: 12,
+              }}>
+                <DesktopOutlined style={{ color: '#fff', fontSize: 24 }} />
+              </div>
+              <div style={{ fontSize: 18, fontWeight: 600, color: '#262626', marginBottom: 6 }}>
+                界面布局
+              </div>
+              <div style={{ fontSize: 14, color: '#666' }}>
+                调整界面显示密度和布局方式
+              </div>
+            </div>
+
+            <Divider style={{ margin: '0 0 24px 0' }} />
+
+            <Row gutter={[32, 16]}>
+              <Col xs={24} md={8}>
+                <Form.Item 
+                  label={<span style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>紧凑模式</span>} 
+                  name="compact_mode"
+                  valuePropName="checked"
+                  style={{ marginBottom: 0 }}
+                >
+                  <Tooltip title="开启后界面元素间距缩小，显示更多内容">
+                    <Switch 
+                      checkedChildren="开启" 
+                      unCheckedChildren="关闭"
+                    />
+                  </Tooltip>
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={8}>
+                <Form.Item 
+                  label={<span style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>侧边栏折叠</span>} 
+                  name="sidebar_collapsed"
+                  valuePropName="checked"
+                  style={{ marginBottom: 0 }}
+                >
+                  <Tooltip title="开启后侧边栏默认折叠为图标模式">
+                    <Switch 
+                      checkedChildren="开启" 
+                      unCheckedChildren="关闭"
+                    />
+                  </Tooltip>
+                </Form.Item>
+              </Col>
+              <Col xs={24} md={8}>
+                <Form.Item 
+                  label={<span style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>表格行高度</span>} 
+                  name="table_row_height"
+                  style={{ marginBottom: 0 }}
+                >
+                  <Select 
+                    placeholder="请选择" 
+                    style={{ width: '100%', height: 40 }}
+                    dropdownStyle={{ borderRadius: 8 }}
+                  >
+                    {getSelectOptions('table_row_height').map(opt => (
+                      <Option key={opt.value} value={opt.value}>{opt.label}</Option>
+                    ))}
+                  </Select>
+                </Form.Item>
+              </Col>
+            </Row>
+          </Card>
+
+          <Card
+            style={{
+              marginBottom: 24,
+              borderRadius: 12,
+              border: '1px solid #e8e8e8',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+            }}
+            bodyStyle={{ padding: '24px' }}
+          >
+            <div style={{ textAlign: 'center', marginBottom: 24 }}>
+              <div style={{ 
+                width: 48, 
+                height: 48, 
+                borderRadius: '50%', 
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: 12,
+              }}>
+                <ThunderboltOutlined style={{ color: '#fff', fontSize: 24 }} />
+              </div>
+              <div style={{ fontSize: 18, fontWeight: 600, color: '#262626', marginBottom: 6 }}>
+                动画效果
+              </div>
+              <div style={{ fontSize: 14, color: '#666' }}>
+                控制界面动画和过渡效果
+              </div>
+            </div>
+
+            <Divider style={{ margin: '0 0 24px 0' }} />
+
+            <Row gutter={[32, 16]}>
+              <Col xs={24} md={12}>
+                <Form.Item 
+                  label={<span style={{ fontSize: 14, color: '#262626', fontWeight: 500 }}>启用动画</span>} 
+                  name="animation_enabled"
+                  valuePropName="checked"
+                  style={{ marginBottom: 0 }}
+                >
+                  <Tooltip title="关闭后可提升低配设备性能">
+                    <Switch 
+                      checkedChildren="开启" 
+                      unCheckedChildren="关闭"
+                    />
+                  </Tooltip>
+                </Form.Item>
+              </Col>
+            </Row>
+          </Card>
         </div>
         {renderFixedFooter()}
       </Form>

@@ -520,4 +520,98 @@ router.get('/stats/dashboard', async (req, res) => {
   }
 });
 
+router.post('/quick-add-device', async (req, res) => {
+  try {
+    const { taskId, planId, serialNumber, deviceName, deviceType, rackId, position, remark } = req.body;
+
+    if (!taskId || !planId || !serialNumber) {
+      return res.status(400).json({ error: '缺少必要参数：taskId, planId, serialNumber' });
+    }
+
+    const task = await InventoryTask.findByPk(taskId);
+    if (!task) {
+      return res.status(404).json({ error: '盘点任务不存在' });
+    }
+
+    const plan = await InventoryPlan.findByPk(planId);
+    if (!plan) {
+      return res.status(404).json({ error: '盘点计划不存在' });
+    }
+
+    const existingDevice = await Device.findOne({ where: { serialNumber } });
+    if (existingDevice) {
+      return res.status(400).json({ error: '该序列号的设备已存在', deviceId: existingDevice.deviceId });
+    }
+
+    let deviceId;
+    const devices = await Device.findAll({
+      where: { deviceId: { [Op.like]: 'DEV%' } }
+    });
+    let maxNumber = 0;
+    devices.forEach(device => {
+      const match = device.deviceId.match(/^DEV(\d+)$/);
+      if (match) {
+        const num = parseInt(match[1], 10);
+        if (num > maxNumber) maxNumber = num;
+      }
+    });
+    deviceId = `DEV${String(maxNumber + 1).padStart(3, '0')}`;
+
+    const newDevice = await Device.create({
+      deviceId,
+      name: deviceName || `新设备-${serialNumber.slice(-6)}`,
+      type: deviceType || 'other',
+      serialNumber,
+      rackId: rackId || null,
+      position: position || null,
+      status: 'running'
+    });
+
+    const record = await InventoryRecord.create({
+      recordId: generateRecordId(),
+      taskId,
+      planId,
+      deviceId: newDevice.deviceId,
+      deviceName: newDevice.name,
+      deviceType: newDevice.type,
+      serialNumber: newDevice.serialNumber,
+      rackId: newDevice.rackId,
+      position: newDevice.position,
+      status: 'normal',
+      abnormalType: 'extra_device',
+      checkedBy: req.user?.userId,
+      checkedAt: new Date(),
+      remark: remark || '盘点时新增设备'
+    });
+
+    const taskRecords = await InventoryRecord.findAll({ where: { taskId: task.taskId } });
+    const taskStats = {
+      totalDevices: taskRecords.length,
+      checkedDevices: taskRecords.filter(r => r.status !== 'pending').length,
+      normalDevices: taskRecords.filter(r => r.status === 'normal').length,
+      abnormalDevices: taskRecords.filter(r => r.status === 'abnormal').length
+    };
+    await task.update(taskStats);
+
+    const planRecords = await InventoryRecord.findAll({ where: { planId: plan.planId } });
+    const planStats = {
+      totalDevices: planRecords.length,
+      checkedDevices: planRecords.filter(r => r.status !== 'pending').length,
+      normalDevices: planRecords.filter(r => r.status === 'normal').length,
+      abnormalDevices: planRecords.filter(r => r.status === 'abnormal').length,
+      missedDevices: planRecords.filter(r => r.status === 'pending').length
+    };
+    await plan.update(planStats);
+
+    res.status(201).json({
+      message: '设备添加成功',
+      device: newDevice,
+      record
+    });
+  } catch (error) {
+    console.error('快速添加设备错误:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
