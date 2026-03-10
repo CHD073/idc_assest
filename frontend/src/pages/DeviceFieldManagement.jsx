@@ -439,7 +439,7 @@ function DeviceFieldManagement() {
               type="text"
               icon={<EditOutlined />}
               onClick={() => showModal(record)}
-              style={editButtonStyle}
+              className="table-action-btn"
             >
               编辑
             </Button>
@@ -450,7 +450,7 @@ function DeviceFieldManagement() {
                   danger
                   icon={<DeleteOutlined />}
                   disabled
-                  style={{ ...deleteButtonStyle, opacity: 0.3, cursor: 'not-allowed' }}
+                  className="table-action-btn-disabled"
                 >
                   删除
                 </Button>
@@ -461,7 +461,7 @@ function DeviceFieldManagement() {
                 danger
                 icon={<DeleteOutlined />}
                 onClick={() => handleDelete(record.fieldId)}
-                style={deleteButtonStyle}
+                className="table-action-btn"
               >
                 删除
               </Button>
@@ -484,7 +484,7 @@ function DeviceFieldManagement() {
           type="primary"
           icon={<PlusOutlined />}
           onClick={() => showModal()}
-          style={primaryActionStyle}
+          className="page-primary-btn"
         >
           添加字段
         </Button>

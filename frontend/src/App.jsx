@@ -539,12 +539,7 @@ const AppLayout = ({ children }) => {
                 danger
                 icon={<LogoutOutlined />}
                 onClick={handleLogout}
-                style={{
-                  padding: '8px 12px',
-                  height: 'auto',
-                  borderRadius: designTokens.borderRadius.small,
-                  fontSize: 13,
-                }}
+                className="logout-btn"
               >
                 退出
               </Button>
