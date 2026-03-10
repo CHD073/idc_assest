@@ -33,24 +33,10 @@ import {
 } from '@ant-design/icons';
 import NetworkCardPanel from './NetworkCardPanel';
 import { deviceAPI } from '../api';
+import { designTokens } from '../config/theme';
 import dayjs from 'dayjs';
 
 const { Text, Title } = Typography;
-
-const designTokens = {
-  colors: {
-    primary: '#1890ff',
-    success: '#52c41a',
-    error: '#f5222d',
-    warning: '#faad14',
-    info: '#13c2c2',
-    gray: '#8c8c8c',
-    bgLight: '#f6ffed',
-    bgBlue: '#e6f7ff',
-    bgGray: '#f5f5f5',
-    bgOrange: '#fff7e6',
-  },
-};
 
 function DeviceDetailDrawer({
   device,

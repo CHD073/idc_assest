@@ -51,85 +51,13 @@ import axios from 'axios';
 import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
 import { motion, AnimatePresence } from 'framer-motion';
+import { designTokens } from '../config/theme';
+import { debounce } from '../utils/common';
 
 const { Option } = Select;
 const { Panel } = Collapse;
 const { Text, Title } = Typography;
 const { TextArea } = Input;
-
-const debounce = (func, wait) => {
-  let timeout;
-  return function executedFunction(...args) {
-    const later = () => {
-      clearTimeout(timeout);
-      func(...args);
-    };
-    clearTimeout(timeout);
-    timeout = setTimeout(later, wait);
-  };
-};
-
-// 设计令牌 - 现代化配色方案
-const designTokens = {
-  colors: {
-    primary: {
-      main: '#6366f1',
-      gradient: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-      light: '#818cf8',
-      dark: '#4f46e5',
-      bg: '#eef2ff',
-    },
-    success: {
-      main: '#10b981',
-      gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-      light: '#34d399',
-      dark: '#047857',
-      bg: '#ecfdf5',
-    },
-    warning: {
-      main: '#f59e0b',
-      gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-      light: '#fbbf24',
-      dark: '#b45309',
-      bg: '#fffbeb',
-    },
-    error: {
-      main: '#ef4444',
-      gradient: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-      light: '#f87171',
-      dark: '#b91c1c',
-      bg: '#fef2f2',
-    },
-    info: {
-      main: '#3b82f6',
-      bg: '#eff6ff',
-    },
-    neutral: {
-      50: '#f8fafc',
-      100: '#f1f5f9',
-      200: '#e2e8f0',
-      300: '#cbd5e1',
-      400: '#94a3b8',
-      500: '#64748b',
-      600: '#475569',
-      700: '#334155',
-      800: '#1e293b',
-      900: '#0f172a',
-    },
-  },
-  borderRadius: {
-    sm: '6px',
-    md: '10px',
-    lg: '16px',
-    xl: '20px',
-  },
-  shadows: {
-    sm: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-    md: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1)',
-    lg: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1)',
-    xl: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)',
-  },
-};
 
 // 动画配置
 const animations = {

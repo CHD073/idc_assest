@@ -50,53 +50,10 @@ import {
   DeleteFilled,
 } from '@ant-design/icons';
 import axios from 'axios';
+import { designTokens } from '../config/theme';
 
 const { Option } = Select;
 const { Title, Text } = Typography;
-
-const designTokens = {
-  colors: {
-    primary: {
-      main: '#1890ff',
-      gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-      bgGradient: 'linear-gradient(135deg, #667eea15 0%, #764ba208 100%)',
-    },
-    success: {
-      main: '#52c41a',
-      gradient: 'linear-gradient(135deg, #52c41a 0%, #389e0d 100%)',
-    },
-    warning: {
-      main: '#faad14',
-      gradient: 'linear-gradient(135deg, #faad14 0%, #d48806 100%)',
-    },
-    error: {
-      main: '#ff4d4f',
-      gradient: 'linear-gradient(135deg, #ff4d4f 0%, #cf1322 100%)',
-    },
-    purple: {
-      main: '#722ed1',
-      gradient: 'linear-gradient(135deg, #722ed1 0%, #531dab 100%)',
-    },
-    text: {
-      primary: '#262626',
-      secondary: '#8c8c8c',
-      tertiary: '#bfbfbf',
-    },
-  },
-  shadows: {
-    small: '0 2px 8px rgba(0, 0, 0, 0.06)',
-    medium: '0 4px 16px rgba(0, 0, 0, 0.08)',
-    large: '0 8px 24px rgba(0, 0, 0, 0.12)',
-  },
-  borderRadius: {
-    small: '8px',
-    medium: '12px',
-    large: '16px',
-  },
-  transitions: {
-    normal: '0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-  },
-};
 
 const containerStyle = {
   minHeight: '100vh',

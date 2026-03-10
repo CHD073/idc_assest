@@ -43,70 +43,11 @@ import {
   datePickerStyles,
   inputPlaceholders,
 } from '../styles/deviceManagementStyles';
+import { designTokens } from '../config/theme';
 
 const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
 const { Option } = Select;
-
-// 设计令牌 - 与其他页面统一
-const designTokens = {
-  colors: {
-    primary: {
-      main: '#6366f1',
-      light: '#818cf8',
-      dark: '#4f46e5',
-      gradient: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
-    },
-    secondary: {
-      main: '#ec4899',
-      light: '#f472b6',
-      gradient: 'linear-gradient(135deg, #ec4899 0%, #f97316 100%)',
-    },
-    success: {
-      main: '#10b981',
-      light: '#34d399',
-      gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-    },
-    warning: {
-      main: '#f59e0b',
-      light: '#fbbf24',
-      gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
-    },
-    error: {
-      main: '#ef4444',
-      light: '#f87171',
-      gradient: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-    },
-    info: {
-      main: '#3b82f6',
-      light: '#60a5fa',
-    },
-    background: {
-      main: '#f8fafc',
-      card: '#ffffff',
-      elevated: '#ffffff',
-    },
-    text: {
-      primary: '#1e293b',
-      secondary: '#64748b',
-      muted: '#94a3b8',
-    },
-    border: '#e2e8f0',
-  },
-  shadows: {
-    small: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-    medium: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-    large: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-    glow: '0 0 20px rgba(99, 102, 241, 0.15)',
-  },
-  borderRadius: {
-    small: '8px',
-    medium: '12px',
-    large: '16px',
-    xl: '20px',
-    full: '9999px',
-  },
-};
 
 // 动画配置
 const containerVariants = {

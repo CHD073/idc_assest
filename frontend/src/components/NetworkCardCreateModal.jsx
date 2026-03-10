@@ -2,20 +2,10 @@ import React, { useState, useCallback } from 'react';
 import { Modal, Form, Input, InputNumber, Select, message, Space, Tooltip } from 'antd';
 import { PlusOutlined, InfoCircleOutlined, CloudServerOutlined } from '@ant-design/icons';
 import axios from 'axios';
+import { designTokens } from '../config/theme';
 
 const { Option } = Select;
 const { TextArea } = Input;
-
-const designTokens = {
-  colors: {
-    primary: {
-      main: '#667eea',
-    },
-  },
-  borderRadius: {
-    medium: '10px',
-  },
-};
 
 function NetworkCardCreateModal({ device, visible, onClose, onSuccess }) {
   const [form] = Form.useForm();

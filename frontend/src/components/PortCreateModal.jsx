@@ -14,21 +14,10 @@ import {
 } from 'antd';
 import { PlusOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import axios from 'axios';
+import { designTokens } from '../config/theme';
 
 const { Option } = Select;
 const { TextArea } = Input;
-
-const designTokens = {
-  colors: {
-    primary: {
-      main: '#667eea',
-      gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-    },
-  },
-  borderRadius: {
-    medium: '10px',
-  },
-};
 
 function parsePortRange(portName) {
   if (!portName || typeof portName !== 'string') {

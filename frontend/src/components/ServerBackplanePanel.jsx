@@ -13,19 +13,9 @@ import {
 } from '@ant-design/icons';
 import PortPanel from './PortPanel';
 import axios from 'axios';
+import { designTokens } from '../config/theme';
 
 const { Text } = Typography;
-
-const designTokens = {
-  colors: {
-    primary: { main: '#667eea', gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' },
-    success: '#10b981',
-    error: '#ef4444',
-    warning: '#f59e0b',
-    metal: { light: '#9ca3af', DEFAULT: '#6b7280', dark: '#4b5563' },
-    slot: { empty: '#d1d5db', occupied: '#3b82f6' },
-  },
-};
 
 /**
  * 服务器背板可视化组件

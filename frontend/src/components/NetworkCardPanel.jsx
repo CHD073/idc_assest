@@ -23,19 +23,9 @@ import {
 import axios from 'axios';
 import PortCreateModal from './PortCreateModal';
 import NetworkCardCreateModal from './NetworkCardCreateModal';
+import { designTokens } from '../config/theme';
 
 const { Panel } = Collapse;
-
-const designTokens = {
-  colors: {
-    primary: {
-      main: '#667eea',
-    },
-    success: '#10b981',
-    error: '#ef4444',
-    warning: '#f59e0b',
-  },
-};
 
 function NetworkCardPanel({ deviceId, deviceName, onRefresh, refreshTrigger }) {
   const [cards, setCards] = useState([]);

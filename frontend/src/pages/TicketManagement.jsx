@@ -45,29 +45,7 @@ import {
 import axios from 'axios';
 import dayjs from 'dayjs';
 import { useSearchParams } from 'react-router-dom';
-
-const debounce = (func, wait) => {
-  let timeout;
-  return function executedFunction(...args) {
-    const later = () => {
-      clearTimeout(timeout);
-      func(...args);
-    };
-    clearTimeout(timeout);
-    timeout = setTimeout(later, wait);
-  };
-};
-
-// 安全地从 localStorage 获取用户信息
-const getUserFromStorage = () => {
-  try {
-    const userStr = localStorage.getItem('user');
-    return userStr ? JSON.parse(userStr) : {};
-  } catch (e) {
-    console.error('解析用户信息失败:', e);
-    return {};
-  }
-};
+import { debounce, getUserFromStorage } from '../utils/common';
 
 const { Option } = Select;
 const { RangePicker } = DatePicker;

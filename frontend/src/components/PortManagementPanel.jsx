@@ -9,17 +9,7 @@ import {
 } from '@ant-design/icons';
 import axios from 'axios';
 import PortCreateModal from './PortCreateModal';
-
-const designTokens = {
-  colors: {
-    primary: {
-      main: '#667eea',
-    },
-    success: '#10b981',
-    error: '#ef4444',
-    warning: '#f59e0b',
-  },
-};
+import { designTokens } from '../config/theme';
 
 function PortManagementPanel({ deviceId, deviceName, onRefresh }) {
   const [ports, setPorts] = useState([]);
