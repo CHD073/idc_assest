@@ -84,17 +84,6 @@ const log = {
 /**
  * 部署配置对象
  * 存储用户交互过程中设置的所有配置参数
- * 
- * @property {string} dbType - 数据库类型：'sqlite' 或 'mysql'
- * @property {Object} dbConfig - MySQL 配置参数（当 dbType='mysql' 时使用）
- * @property {number} backendPort - 后端服务监听端口
- * @property {string} frontendDeploy - 前端部署方式：'nginx' 或 'pm2'
- * @property {number} frontendPort - 前端服务监听端口
- * @property {string} domain - 域名配置（Nginx 使用）
- */
-/**
- * 部署配置对象
- * 存储用户交互过程中设置的所有配置参数
  *
  * @property {string} dbType - 数据库类型：'sqlite' 或 'mysql'
  * @property {Object} dbConfig - MySQL 配置参数（当 dbType='mysql' 时使用）
@@ -139,12 +128,66 @@ const rl = readline.createInterface({
  */
 function ask(question, defaultValue = '') {
   return new Promise((resolve) => {
-    // 如果有默认值，在提示中显示
     const prompt = defaultValue ? `${question} (${defaultValue}): ` : `${question}: `;
     rl.question(prompt, (answer) => {
-      // 如果用户未输入，使用默认值
       resolve(answer.trim() || defaultValue);
     });
+  });
+}
+
+/**
+ * 密码输入函数 - 隐藏输入内容
+ * 
+ * @param {string} question - 提示问题文本
+ * @returns {Promise<string>} 用户输入的密码
+ * 
+ * 使用示例：
+ *   const password = await askPassword('请输入密码');
+ */
+function askPassword(question) {
+  return new Promise((resolve) => {
+    const prompt = `${question}: `;
+    process.stdout.write(prompt);
+    
+    let password = '';
+    const stdin = process.stdin;
+    const wasRaw = stdin.isRaw;
+    
+    if (stdin.isTTY) {
+      stdin.setRawMode(true);
+    }
+    stdin.resume();
+    stdin.setEncoding('utf8');
+    
+    const onData = (char) => {
+      const c = char;
+      
+      switch (c) {
+        case '\n':
+        case '\r':
+        case '\u0004':
+          if (stdin.isTTY) {
+            stdin.setRawMode(wasRaw || false);
+          }
+          stdin.pause();
+          stdin.removeListener('data', onData);
+          console.log();
+          resolve(password);
+          break;
+        case '\u0003':
+          process.exit();
+          break;
+        case '\u007F':
+        case '\b':
+          password = password.slice(0, -1);
+          break;
+        default:
+          password += c;
+          break;
+      }
+    };
+    
+    stdin.on('data', onData);
   });
 }
 
@@ -162,18 +205,26 @@ function ask(question, defaultValue = '') {
  *   ]);
  */
 async function select(question, options) {
-  // 显示问题和选项列表
   console.log(`\n${question}`);
   options.forEach((opt, idx) => {
     console.log(`  ${colors.cyan}${idx + 1}.${colors.reset} ${opt.label}`);
   });
 
-  // 获取用户输入并转换为索引
   const answer = await ask('请选择', '1');
   const index = parseInt(answer) - 1;
   
-  // 返回选中的值，如果无效则返回第一个选项
   return options[index]?.value || options[0].value;
+}
+
+/**
+ * 生成随机密钥
+ * 
+ * @param {number} length - 密钥长度，默认64位
+ * @returns {string} 随机密钥
+ */
+function generateSecretKey(length = 64) {
+  const crypto = require('crypto');
+  return crypto.randomBytes(length).toString('hex');
 }
 
 // =============================================================================
@@ -752,7 +803,7 @@ async function configureDatabase() {
     config.dbConfig.host = await ask('MySQL 主机地址', 'localhost');
     config.dbConfig.port = await ask('MySQL 端口', '3306');
     config.dbConfig.username = await ask('MySQL 用户名', 'root');
-    config.dbConfig.password = await ask('MySQL 密码', '');
+    config.dbConfig.password = await askPassword('MySQL 密码');
     config.dbConfig.database = await ask('数据库名称', 'idc_management');
   }
 
@@ -1126,7 +1177,8 @@ async function autoInstallNginx() {
 function generateBackendEnv() {
   const envPath = path.join(__dirname, 'backend', '.env');
 
-  // 构建环境变量内容
+  const jwtSecret = generateSecretKey(64);
+
   let envContent = `# IDC设备管理系统 - 环境配置
 # 生成时间: ${new Date().toISOString()}
 
@@ -1141,6 +1193,13 @@ PORT=${config.backendPort}
 NODE_ENV=${config.nodeEnv}
 
 # ==============================================
+# 安全配置
+# ==============================================
+
+# JWT 密钥（自动生成，请妥善保管）
+JWT_SECRET=${jwtSecret}
+
+# ==============================================
 # 数据库配置
 # ==============================================
 
@@ -1148,7 +1207,6 @@ NODE_ENV=${config.nodeEnv}
 DB_TYPE=${config.dbType}
 `;
 
-  // 根据数据库类型添加相应配置
   if (config.dbType === 'sqlite') {
     envContent += `
 # SQLite 配置
@@ -1165,9 +1223,9 @@ MYSQL_DATABASE=${config.dbConfig.database}
 `;
   }
 
-  // 写入文件
   fs.writeFileSync(envPath, envContent);
   log.success('后端环境变量文件已生成 (.env)');
+  log.info(`JWT_SECRET 已自动生成 (${jwtSecret.length}位)`);
 }
 
 /**
@@ -1489,7 +1547,10 @@ async function startServices() {
 
   // 停止已有服务（避免冲突）
   log.info('停止已有服务...');
-  runCommand('pm2 stop idc-backend idc-frontend 2>nul || true', { silent: true });
+  const stopCmd = process.platform === 'win32' 
+    ? 'pm2 stop idc-backend idc-frontend 2>nul || exit 0' 
+    : 'pm2 stop idc-backend idc-frontend 2>/dev/null || true';
+  runCommand(stopCmd, { silent: true });
 
   // 启动后端服务
   log.info('启动后端服务...');

@@ -111,41 +111,41 @@ function isRootUser() {
 async function stopAndDeleteServices() {
   log.step('停止并删除服务');
 
-  // 检查 PM2 是否存在
   if (!commandExists('pm2')) {
     log.warning('未检测到 PM2，跳过服务停止步骤');
     return;
   }
 
-  // 停止并删除后端服务
+  const isWindows = process.platform === 'win32';
+  const nullRedirect = isWindows ? '2>nul' : '2>/dev/null';
+  const orTrue = isWindows ? '|| exit 0' : '|| true';
+
   log.info('停止后端服务 (idc-backend)...');
-  const backendStop = runCommand('pm2 stop idc-backend 2>nul || true', { silent: true });
+  const backendStop = runCommand(`pm2 stop idc-backend ${nullRedirect} ${orTrue}`, { silent: true });
   if (backendStop.success) {
     log.success('后端服务已停止');
   }
 
   log.info('删除后端服务 (idc-backend)...');
-  const backendDelete = runCommand('pm2 delete idc-backend 2>nul || true', { silent: true });
+  const backendDelete = runCommand(`pm2 delete idc-backend ${nullRedirect} ${orTrue}`, { silent: true });
   if (backendDelete.success) {
     log.success('后端服务已删除');
   }
 
-  // 停止并删除前端服务
   log.info('停止前端服务 (idc-frontend)...');
-  const frontendStop = runCommand('pm2 stop idc-frontend 2>nul || true', { silent: true });
+  const frontendStop = runCommand(`pm2 stop idc-frontend ${nullRedirect} ${orTrue}`, { silent: true });
   if (frontendStop.success) {
     log.success('前端服务已停止');
   }
 
   log.info('删除前端服务 (idc-frontend)...');
-  const frontendDelete = runCommand('pm2 delete idc-frontend 2>nul || true', { silent: true });
+  const frontendDelete = runCommand(`pm2 delete idc-frontend ${nullRedirect} ${orTrue}`, { silent: true });
   if (frontendDelete.success) {
     log.success('前端服务已删除');
   }
 
-  // 保存 PM2 配置
   log.info('保存 PM2 配置...');
-  runCommand('pm2 save 2>nul || true', { silent: true });
+  runCommand(`pm2 save ${nullRedirect} ${orTrue}`, { silent: true });
 
   log.divider();
 }
