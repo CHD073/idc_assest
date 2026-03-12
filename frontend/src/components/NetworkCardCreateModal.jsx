@@ -3,6 +3,7 @@ import { Modal, Form, Input, InputNumber, Select, message, Space, Tooltip } from
 import { PlusOutlined, InfoCircleOutlined, CloudServerOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import { designTokens } from '../config/theme';
+import CloseButton from './CloseButton';
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -55,6 +56,7 @@ function NetworkCardCreateModal({ device, visible, onClose, onSuccess }) {
         </Space>
       }
       open={visible}
+      closeIcon={<CloseButton />}
       onOk={handleSubmit}
       onCancel={handleCancel}
       confirmLoading={loading}

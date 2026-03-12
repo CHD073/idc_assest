@@ -630,9 +630,34 @@ body {
 }
 
 .ant-modal-close-x {
-  width: 56px !important;
-  height: 56px !important;
-  line-height: 56px !important;
+  width: 56px;
+  height: 56px;
+  line-height: 56px;
+}
+
+.ant-modal-close {
+  background: transparent !important;
+}
+
+.ant-modal-close:hover {
+  background: transparent !important;
+}
+
+.modal-close-btn {
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.modal-close-btn:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: rgba(0, 0, 0, 0.88);
+}
+
+.modal-close-btn:hover svg {
+  transform: rotate(90deg);
+}
+
+.modal-close-btn:active {
+  background: rgba(0, 0, 0, 0.1);
 }
 
 .ant-message-notice-content {

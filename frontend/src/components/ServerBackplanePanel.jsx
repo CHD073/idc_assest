@@ -14,6 +14,7 @@ import {
 import PortPanel from './PortPanel';
 import axios from 'axios';
 import { designTokens } from '../config/theme';
+import CloseButton from './CloseButton';
 
 const { Text } = Typography;
 
@@ -620,6 +621,7 @@ const ServerBackplanePanel = ({
           </div>
         }
         open={!!selectedSlot}
+        closeIcon={<CloseButton />}
         onCancel={() => setSelectedSlot(null)}
         footer={null}
         width={700}

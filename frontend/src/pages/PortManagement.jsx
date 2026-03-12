@@ -54,6 +54,7 @@ import VirtualDeviceList from '../components/VirtualDeviceList';
 import NetworkCardPanel from '../components/NetworkCardPanel';
 import NetworkCardCreateModal from '../components/NetworkCardCreateModal';
 import { designTokens } from '../config/theme';
+import CloseButton from '../components/CloseButton';
 import { debounce } from '../utils/common';
 
 const { Option } = Select;
@@ -1155,6 +1156,7 @@ function PortManagement() {
           </div>
         }
         open={modalVisible}
+        closeIcon={<CloseButton />}
         onOk={handleSubmit}
         onCancel={() => {
           setModalVisible(false);
@@ -1293,6 +1295,7 @@ function PortManagement() {
           </div>
         }
         open={importModalVisible}
+        closeIcon={<CloseButton />}
         onCancel={() => {
           setImportModalVisible(false);
           setImportPreview([]);
@@ -1457,6 +1460,7 @@ function PortManagement() {
           </div>
         }
         open={networkCardModalVisible}
+        closeIcon={<CloseButton />}
         onCancel={() => {
           setNetworkCardModalVisible(false);
           setSelectedDeviceForNic(null);

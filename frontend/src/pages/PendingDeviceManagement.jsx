@@ -36,6 +36,7 @@ import axios from 'axios';
 import dayjs from 'dayjs';
 import { useNavigate } from 'react-router-dom';
 import { designTokens } from '../config/theme';
+import CloseButton from '../components/CloseButton';
 
 const api = axios.create({
   baseURL: '/api',
@@ -779,6 +780,7 @@ const PendingDeviceManagement = () => {
       <Modal
         title="编辑暂存设备"
         open={editModalVisible}
+        closeIcon={<CloseButton />}
         onCancel={() => {
           setEditModalVisible(false);
           setSelectedRoomId(null);

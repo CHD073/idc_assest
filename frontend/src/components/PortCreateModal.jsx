@@ -15,6 +15,7 @@ import {
 import { PlusOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import axios from 'axios';
 import { designTokens } from '../config/theme';
+import CloseButton from './CloseButton';
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -201,6 +202,7 @@ function PortCreateModal({ device, visible, onClose, onSuccess, defaultNicId, ne
         </Space>
       }
       open={visible}
+      closeIcon={<CloseButton />}
       onOk={handleSubmit}
       onCancel={handleCancel}
       confirmLoading={loading}

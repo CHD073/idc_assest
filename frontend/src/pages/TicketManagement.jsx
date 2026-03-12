@@ -43,6 +43,7 @@ import {
   TagOutlined,
 } from '@ant-design/icons';
 import axios from 'axios';
+import CloseButton from '../components/CloseButton';
 import dayjs from 'dayjs';
 import { useSearchParams } from 'react-router-dom';
 import { debounce, getUserFromStorage } from '../utils/common';
@@ -1047,6 +1048,7 @@ function TicketManagement() {
       <Modal
         title={editingTicket ? '编辑工单' : '创建工单'}
         open={modalVisible}
+        closeIcon={<CloseButton />}
         onCancel={handleCancel}
         footer={null}
         width={700}
@@ -1067,6 +1069,7 @@ function TicketManagement() {
       <Modal
         title="处理工单"
         open={processingModalVisible}
+        closeIcon={<CloseButton />}
         onCancel={() => setProcessingModalVisible(false)}
         footer={null}
         width={600}
@@ -1114,6 +1117,7 @@ function TicketManagement() {
       <Modal
         title={`工单详情 - ${selectedTicket?.ticketId}`}
         open={detailModalVisible}
+        closeIcon={<CloseButton />}
         onCancel={() => setDetailModalVisible(false)}
         footer={[
           <Button key="close" onClick={() => setDetailModalVisible(false)}>

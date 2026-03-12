@@ -16,6 +16,7 @@ import {
 } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, SearchOutlined } from '@ant-design/icons';
 import axios from 'axios';
+import CloseButton from '../components/CloseButton';
 import {
   inputStyles,
   selectStyles,
@@ -222,6 +223,7 @@ function CategoryManagement() {
       <Modal
         title={editingCategory ? '编辑分类' : '添加分类'}
         open={modalVisible}
+        closeIcon={<CloseButton />}
         onCancel={handleCancel}
         footer={null}
         width={500}

@@ -39,6 +39,7 @@ import axios from 'axios';
 import dayjs from 'dayjs';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { designTokens } from '../config/theme';
+import CloseButton from '../components/CloseButton';
 
 const { RangePicker } = DatePicker;
 const { TabPane } = Tabs;
@@ -600,6 +601,7 @@ const InventoryManagement = () => {
           </div>
         }
         open={modalVisible}
+        closeIcon={<CloseButton />}
         onCancel={() => setModalVisible(false)}
         footer={null}
         width={640}

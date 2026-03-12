@@ -29,6 +29,7 @@ import {
 } from '@ant-design/icons';
 import axios from 'axios';
 import { designTokens } from '../config/theme';
+import CloseButton from '../components/CloseButton';
 
 const { Option = Select.Option } = Select;
 
@@ -444,6 +445,7 @@ function DeviceFieldManagement() {
       <Modal
         title={<span style={modalTitleStyle}>{editingField ? '编辑字段' : '添加字段'}</span>}
         open={modalVisible}
+        closeIcon={<CloseButton />}
         onCancel={handleCancel}
         footer={null}
         width={600}

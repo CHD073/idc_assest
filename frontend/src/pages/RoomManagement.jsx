@@ -46,6 +46,7 @@ import {
 } from '@ant-design/icons';
 import axios from 'axios';
 import { designTokens } from '../config/theme';
+import CloseButton from '../components/CloseButton';
 
 const { Option } = Select;
 const { Title, Text } = Typography;
@@ -756,6 +757,7 @@ function RoomManagement() {
           </div>
         }
         open={modalVisible}
+        closeIcon={<CloseButton />}
         onCancel={handleCancel}
         footer={null}
         width={600}

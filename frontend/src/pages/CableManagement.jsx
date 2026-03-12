@@ -53,6 +53,7 @@ import Papa from 'papaparse';
 import { motion, AnimatePresence } from 'framer-motion';
 import { designTokens } from '../config/theme';
 import { debounce } from '../utils/common';
+import CloseButton from '../components/CloseButton';
 
 const { Option } = Select;
 const { Panel } = Collapse;
@@ -1235,6 +1236,11 @@ function CableManagement() {
         width={700}
         okText="确定"
         cancelText="取消"
+        closeIcon={<CloseButton />}
+        styles={{
+          content: { padding: '24px' },
+          header: { marginBottom: 16 },
+        }}
         okButtonProps={{
           style: {
             background: designTokens.colors.primary.gradient,
@@ -1446,6 +1452,7 @@ function CableManagement() {
           </div>
         }
         open={importModalVisible}
+        closeIcon={<CloseButton />}
         onCancel={() => {
           setImportModalVisible(false);
           setImportPreview([]);
@@ -1595,6 +1602,7 @@ function CableManagement() {
           </div>
         }
         open={conflictModalVisible}
+        closeIcon={<CloseButton />}
         onCancel={() => {
           setConflictModalVisible(false);
           setConflictInfo(null);

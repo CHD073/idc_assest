@@ -39,6 +39,7 @@ import NetworkCardCreateModal from '../components/NetworkCardCreateModal';
 import PortCreateModal from '../components/PortCreateModal';
 import CableCreateModal from '../components/CableCreateModal';
 import DeviceDetailDrawer from '../components/DeviceDetailDrawer';
+import CloseButton from '../components/CloseButton';
 import { useScene3D } from '../context/Scene3DContext';
 
 const { Header, Content, Sider } = Layout;
@@ -914,6 +915,7 @@ const Rack3DVisualization = () => {
             }
             open={modalVisible}
             onCancel={handleModalCancel}
+            closeIcon={<CloseButton />}
             footer={null}
             width={700}
           >
@@ -990,8 +992,13 @@ const Rack3DVisualization = () => {
             }
             open={showTooltipConfig}
             onCancel={() => setShowTooltipConfig(false)}
+            closeIcon={<CloseButton />}
             footer={null}
             width={520}
+            styles={{
+              content: { padding: '24px' },
+              header: { marginBottom: 16 },
+            }}
           >
             {loadingTooltipFields ? (
               <div style={{ textAlign: 'center', padding: '20px' }}>

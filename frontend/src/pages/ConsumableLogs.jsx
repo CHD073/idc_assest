@@ -36,6 +36,7 @@ import {
   EyeOutlined,
 } from '@ant-design/icons';
 import axios from 'axios';
+import CloseButton from '../components/CloseButton';
 import dayjs from 'dayjs';
 import * as XLSX from 'xlsx';
 import {
@@ -671,6 +672,7 @@ function ConsumableLogs() {
       <Modal
         title="导入操作日志"
         open={importModalVisible}
+        closeIcon={<CloseButton />}
         onCancel={() => {
           setImportModalVisible(false);
           setImportType('excel');
@@ -721,6 +723,7 @@ function ConsumableLogs() {
       <Modal
         title="编辑日志记录"
         open={editModalVisible}
+        closeIcon={<CloseButton />}
         onCancel={() => {
           setEditModalVisible(false);
           form.resetFields();
@@ -753,6 +756,7 @@ function ConsumableLogs() {
       <Modal
         title="日志修改历史"
         open={historyModalVisible}
+        closeIcon={<CloseButton />}
         onCancel={() => {
           setHistoryModalVisible(false);
           setLogHistory([]);
@@ -832,6 +836,7 @@ function ConsumableLogs() {
       <Modal
         title="归档记录详情"
         open={archiveModalVisible}
+        closeIcon={<CloseButton />}
         onCancel={() => {
           setArchiveModalVisible(false);
           setCurrentArchive(null);

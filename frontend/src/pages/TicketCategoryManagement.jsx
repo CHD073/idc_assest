@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Table, Button, Modal, Form, Input, Select, message, Card, Space, Popconfirm } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined, ReloadOutlined } from '@ant-design/icons';
 import axios from 'axios';
+import CloseButton from '../components/CloseButton';
 
 const { Option } = Select;
 
@@ -191,6 +192,7 @@ function TicketCategoryManagement() {
       <Modal
         title={editingCategory ? '编辑分类' : '添加分类'}
         open={modalVisible}
+        closeIcon={<CloseButton />}
         onCancel={handleCancel}
         footer={null}
         width={600}

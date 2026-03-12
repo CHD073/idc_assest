@@ -38,6 +38,7 @@ import axios from 'axios';
 import dayjs from 'dayjs';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { designTokens } from '../config/theme';
+import CloseButton from '../components/CloseButton';
 
 const api = axios.create({
   baseURL: '/api',
@@ -1501,6 +1502,7 @@ const InventoryTaskExecution = () => {
       <Modal
         title="设备盘点"
         open={checkModalVisible}
+        closeIcon={<CloseButton />}
         onCancel={() => setCheckModalVisible(false)}
         footer={null}
         width={600}
@@ -1572,6 +1574,7 @@ const InventoryTaskExecution = () => {
       <Modal
         title={null}
         open={quickAddModalVisible}
+        closeIcon={<CloseButton />}
         onCancel={() => {
           setQuickAddModalVisible(false);
           setSelectedRoomId(null);

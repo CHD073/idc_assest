@@ -49,6 +49,7 @@ import {
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import { designTokens } from '../config/theme';
+import CloseButton from '../components/CloseButton';
 import {
   inputStyles,
   selectStyles,
@@ -1191,6 +1192,7 @@ function ConsumableManagement() {
           </div>
         }
         open={modalVisible}
+        closeIcon={<CloseButton />}
         onCancel={handleCancel}
         footer={null}
         width={900}
@@ -1750,6 +1752,7 @@ function ConsumableManagement() {
           </div>
         }
         open={importModalVisible}
+        closeIcon={<CloseButton />}
         onCancel={handleImportCancel}
         footer={null}
         width={700}
@@ -1885,6 +1888,7 @@ function ConsumableManagement() {
           </div>
         }
         open={stockModalVisible}
+        closeIcon={<CloseButton />}
         onCancel={handleStockCancel}
         footer={null}
         width={500}
@@ -2040,6 +2044,7 @@ function ConsumableManagement() {
       <Modal
         title={scanMode === 'add' ? '扫码添加SN' : scanMode === 'in' ? '扫码入库' : '扫码出库'}
         open={scanModalVisible}
+        closeIcon={<CloseButton />}
         onCancel={handleScanCancel}
         footer={null}
         width={500}

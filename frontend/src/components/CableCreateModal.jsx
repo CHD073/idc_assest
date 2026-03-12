@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Modal, Form, Select, Input, Button, message, Space, Spin } from 'antd';
 import { SwapOutlined } from '@ant-design/icons';
 import axios from 'axios';
+import CloseButton from './CloseButton';
 import { debounce } from '../utils/common';
 
 const { Option } = Select;
@@ -148,6 +149,7 @@ const CableCreateModal = ({ visible, onClose, onSuccess, sourceDevice }) => {
         </Space>
       }
       open={visible}
+      closeIcon={<CloseButton />}
       onCancel={onClose}
       onOk={handleSubmit}
       confirmLoading={loading}

@@ -14,6 +14,7 @@ import {
 } from 'antd';
 import { PlusOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import axios from 'axios';
+import CloseButton from '../components/CloseButton';
 
 const { Option } = Select;
 
@@ -198,6 +199,7 @@ function TicketFieldManagement() {
       <Modal
         title={editingField ? '编辑字段' : '添加字段'}
         open={modalVisible}
+        closeIcon={<CloseButton />}
         onCancel={handleCancel}
         footer={null}
         width={600}

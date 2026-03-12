@@ -27,6 +27,7 @@ import {
   CloseOutlined,
 } from '@ant-design/icons';
 import { userAPI, roleAPI } from '../api';
+import CloseButton from '../components/CloseButton';
 
 const { Option } = Select;
 
@@ -610,6 +611,7 @@ const UserManagement = () => {
           </div>
         }
         open={modalVisible}
+        closeIcon={<CloseButton />}
         onCancel={() => setModalVisible(false)}
         footer={null}
         width={500}
@@ -734,6 +736,7 @@ const UserManagement = () => {
           </div>
         }
         open={passwordModalVisible}
+        closeIcon={<CloseButton />}
         onCancel={() => setPasswordModalVisible(false)}
         footer={null}
         width={400}
@@ -795,6 +798,7 @@ const UserManagement = () => {
           </div>
         }
         open={avatarModalVisible}
+        closeIcon={<CloseButton />}
         onCancel={() => setAvatarModalVisible(false)}
         footer={null}
         width={400}
