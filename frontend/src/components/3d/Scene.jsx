@@ -12,6 +12,7 @@ const envMapUrl = '/assets/3d/env.hdr';
 import RackModel from './RackModel';
 import { useScene3D } from '../../context/Scene3DContext';
 import * as THREE from 'three';
+import ErrorBoundary from '../ErrorBoundary';
 
 // 检测是否为移动设备
 const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
@@ -153,50 +154,56 @@ const Scene = forwardRef(
     }, [rackHeightMeters]);
 
     return (
-      <Canvas
-        shadows
-        dpr={deviceDpr}
-        performance={{ min: 0.5 }}
-        gl={{
-          antialias: true, // 对所有设备开启抗锯齿提升清晰度
-          alpha: true, // 必须开启alpha以支持透明背景
-          powerPreference: 'high-performance',
-        }}
-        style={{ background: 'transparent' }}
+      <ErrorBoundary
+        fullPage={false}
+        title="3D 场景渲染失败"
+        subTitle="3D 场景在渲染过程中遇到错误，请检查浏览器是否支持 WebGL"
       >
-        <PerspectiveCamera makeDefault position={cameraPosition} fov={45} />
-
-        <ambientLight intensity={0.5} color="#ffffff" />
-        <pointLight position={[5, 8, 5]} intensity={2} color="#ffffff" castShadow />
-        <directionalLight
-          position={[10, 10, 5]}
-          intensity={1}
-          castShadow
-          shadow-mapSize={[2048, 2048]}
-          shadow-camera-far={20}
-          shadow-camera-left={-10}
-          shadow-camera-right={10}
-          shadow-camera-top={10}
-          shadow-camera-bottom={-10}
-        />
-
-        <Suspense fallback={null}>
-          <Environment files={envMapUrl} blur={0.5} resolution={256} background={false} />
-        </Suspense>
-
-        {/* Models */}
-        <group position={[0, 0, 0]}>
-          <RackModel {...rackModelProps} />
-        </group>
-
-        {/* Controls - 使用独立组件保持旋转中心固定 */}
-        <Controls
-          rack={rack}
-          onControlsReady={api => {
-            controlsApiRef.current = api;
+        <Canvas
+          shadows
+          dpr={deviceDpr}
+          performance={{ min: 0.5 }}
+          gl={{
+            antialias: true, // 对所有设备开启抗锯齿提升清晰度
+            alpha: true, // 必须开启 alpha 以支持透明背景
+            powerPreference: 'high-performance',
           }}
-        />
-      </Canvas>
+          style={{ background: 'transparent' }}
+        >
+          <PerspectiveCamera makeDefault position={cameraPosition} fov={45} />
+
+          <ambientLight intensity={0.5} color="#ffffff" />
+          <pointLight position={[5, 8, 5]} intensity={2} color="#ffffff" castShadow />
+          <directionalLight
+            position={[10, 10, 5]}
+            intensity={1}
+            castShadow
+            shadow-mapSize={[2048, 2048]}
+            shadow-camera-far={20}
+            shadow-camera-left={-10}
+            shadow-camera-right={10}
+            shadow-camera-top={10}
+            shadow-camera-bottom={-10}
+          />
+
+          <Suspense fallback={null}>
+            <Environment files={envMapUrl} blur={0.5} resolution={256} background={false} />
+          </Suspense>
+
+          {/* Models */}
+          <group position={[0, 0, 0]}>
+            <RackModel {...rackModelProps} />
+          </group>
+
+          {/* Controls - 使用独立组件保持旋转中心固定 */}
+          <Controls
+            rack={rack}
+            onControlsReady={api => {
+              controlsApiRef.current = api;
+            }}
+          />
+        </Canvas>
+      </ErrorBoundary>
     );
   }
 );

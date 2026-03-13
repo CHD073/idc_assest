@@ -153,4 +153,21 @@ export const ticketCategoryAPI = {
   init: () => api.post('/ticket-categories/init'),
 };
 
+export const backupAPI = {
+  list: () => api.get('/backup/list'),
+  create: (data = {}) => api.post('/backup', data),
+  validate: filename => api.get(`/backup/validate/${filename}`),
+  restore: (filename, options = {}) => api.post('/backup/restore', { filename, options }),
+  download: filename => `/api/backup/download/${filename}`,
+  delete: filename => api.delete(`/backup/${filename}`),
+  upload: file => {
+    const formData = new FormData();
+    formData.append('backup', file);
+    return api.post('/backup/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  info: () => api.get('/backup/info'),
+};
+
 export default api;

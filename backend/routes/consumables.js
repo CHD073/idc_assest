@@ -41,9 +41,17 @@ router.get('/', async (req, res) => {
       order: [['createdAt', 'DESC']]
     });
     
+    const consumables = rows.map(item => {
+      const data = item.toJSON();
+      if (!Array.isArray(data.snList)) {
+        data.snList = [];
+      }
+      return data;
+    });
+    
     res.json({
       total: count,
-      consumables: rows,
+      consumables,
       page: parseInt(page),
       pageSize: parseInt(pageSize)
     });
@@ -182,12 +190,16 @@ router.get('/by-sn/:sn', async (req, res) => {
     const sn = req.params.sn;
     const consumables = await Consumable.findAll();
     const consumable = consumables.find(c => {
-      const snList = c.snList || [];
+      const snList = Array.isArray(c.snList) ? c.snList : [];
       return snList.includes(sn);
     });
+    const result = consumable ? consumable.toJSON() : null;
+    if (result && !Array.isArray(result.snList)) {
+      result.snList = [];
+    }
     res.json({
       found: !!consumable,
-      consumable
+      consumable: result
     });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -831,7 +843,11 @@ router.get('/:id', async (req, res) => {
     if (!consumable) {
       return res.status(404).json({ error: '耗材不存在' });
     }
-    res.json(consumable);
+    const data = consumable.toJSON();
+    if (!Array.isArray(data.snList)) {
+      data.snList = [];
+    }
+    res.json(data);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }

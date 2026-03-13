@@ -715,11 +715,11 @@ function ConsumableManagement() {
         render: text => <Text type="secondary">{text}</Text>,
       },
       {
-        title: 'SN数量',
+        title: 'SN 数量',
         key: 'snCount',
         width: 120,
         render: (_, record) => {
-          const snList = record.snList || [];
+          const snList = Array.isArray(record.snList) ? record.snList : [];
           const snCount = snList.length;
           const stock = record.currentStock || 0;
           
@@ -744,7 +744,7 @@ function ConsumableManagement() {
           return (
             <Popover 
               content={snContent} 
-              title={`SN列表 (${snCount}个)`}
+              title={`SN 列表 (${snCount}个)`}
               trigger="click"
               placement="right"
             >
@@ -1954,11 +1954,12 @@ function ConsumableManagement() {
                   }}
                 >
                   {(() => {
-                    const filteredSnList = stockRecord.snList.filter(sn => 
+                    const snListArray = Array.isArray(stockRecord.snList) ? stockRecord.snList : [];
+                    const filteredSnList = snListArray.filter(sn => 
                       sn.toLowerCase().includes(snSearchKeyword.toLowerCase())
                     );
                     if (filteredSnList.length === 0) {
-                      return <Text type="secondary" style={{ display: 'block', textAlign: 'center', padding: '16px 0' }}>无匹配的SN</Text>;
+                      return <Text type="secondary" style={{ display: 'block', textAlign: 'center', padding: '16px 0' }}>无匹配的 SN</Text>;
                     }
                     return filteredSnList.map((sn, index) => (
                       <Tag.CheckableTag
@@ -2090,7 +2091,7 @@ function ConsumableManagement() {
                   padding: '8px'
                 }}
               >
-                {snList.map((sn, index) => (
+                {(Array.isArray(snList) ? snList : []).map((sn, index) => (
                   <Tag
                     key={index}
                     closable

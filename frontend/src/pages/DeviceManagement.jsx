@@ -308,8 +308,8 @@ function DeviceManagement() {
       cancelText: '取消',
       onOk: async () => {
         try {
-          const response = await axios.delete('/api/devices/batch-delete', {
-            data: { deviceIds: selectedDevices },
+          const response = await axios.post('/api/devices/batch-delete', {
+            deviceIds: selectedDevices,
           });
           message.success(response.data.message || '批量删除成功');
           setSelectedDevices([]);
@@ -318,6 +318,10 @@ function DeviceManagement() {
         } catch (error) {
           message.error('批量删除失败');
           console.error('批量删除设备失败:', error);
+          // 显示更具体的错误信息
+          if (error.response?.data?.error) {
+            console.error('后端错误详情:', error.response.data.error);
+          }
         }
       },
     });

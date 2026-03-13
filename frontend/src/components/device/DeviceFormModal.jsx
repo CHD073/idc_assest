@@ -103,7 +103,7 @@ const DeviceFormModal = ({
             style={inputStyle}
             className="form-input-enhanced"
           >
-            {field.options &&
+            {Array.isArray(field.options) &&
               field.options.map((option) => (
                 <Option key={option.value} value={option.value}>
                   {option.label}

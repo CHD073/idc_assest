@@ -53,6 +53,7 @@ import useIdleTimeout from './hooks/useIdleTimeout';
 import { SWRConfig, swrConfig } from './hooks/useSWR';
 import axios from 'axios';
 import { Spin } from 'antd';
+import ErrorBoundary from './components/ErrorBoundary';
 
 const Dashboard = lazy(() => import('./pages/Dashboard'));
 const DeviceManagement = lazy(() => import('./pages/DeviceManagement'));
@@ -76,6 +77,9 @@ const PortManagement = lazy(() => import('./pages/PortManagement'));
 const InventoryManagement = lazy(() => import('./pages/InventoryManagement'));
 const InventoryTaskExecution = lazy(() => import('./pages/InventoryTaskExecution'));
 const PendingDeviceManagement = lazy(() => import('./pages/PendingDeviceManagement'));
+const BackupManagement = lazy(() => import('./pages/BackupManagement'));
+const AutoBackupSettings = lazy(() => import('./pages/AutoBackupSettings'));
+const ErrorBoundaryTest = lazy(() => import('./pages/ErrorBoundaryTest'));
 
 const { Header, Content, Sider } = Layout;
 
@@ -198,7 +202,8 @@ const AppLayout = ({ children }) => {
       path.startsWith('/users') ||
       path.startsWith('/login-history') ||
       path.startsWith('/operation-logs') ||
-      path.startsWith('/settings')
+      path.startsWith('/settings') ||
+      path.startsWith('/backup')
     )
       return 'system-management';
     if (path.startsWith('/tickets')) return 'ticket-management';
@@ -346,6 +351,11 @@ const AppLayout = ({ children }) => {
           key: 'system-settings',
           icon: <SettingOutlined style={{ fontSize: '16px' }} />,
           label: <Link to="/settings">系统设置</Link>,
+        },
+        {
+          key: 'backup',
+          icon: <DatabaseOutlined style={{ fontSize: '16px' }} />,
+          label: <Link to="/backup">数据备份</Link>,
         },
       ],
     },
@@ -583,10 +593,41 @@ const routeConfig = [
   { path: '/inventory/execution', component: InventoryTaskExecution },
   { path: '/pending-devices', component: PendingDeviceManagement },
   { path: '/ports', component: PortManagement },
+  { path: '/backup', component: BackupManagement },
+  { path: '/auto-backup-settings', component: AutoBackupSettings },
+  { path: '/error-boundary-test', component: ErrorBoundaryTest },
 ];
 
 const ThemeConfig = () => {
   const designTokens = useDesignTokens();
+
+  const renderRoute = (path, Component, needsErrorBoundary = true) => {
+    const element = (
+      <PrivateRoute>
+        <Component />
+      </PrivateRoute>
+    );
+
+    if (needsErrorBoundary) {
+      return (
+        <Route
+          key={path}
+          path={path}
+          element={
+            <ErrorBoundary
+              fullPage={false}
+              title="页面加载失败"
+              subTitle="该页面在加载过程中遇到了错误，请尝试重新加载"
+            >
+              {element}
+            </ErrorBoundary>
+          }
+        />
+      );
+    }
+
+    return <Route key={path} path={path} element={element} />;
+  };
 
   return (
     <AntdConfigProvider theme={{ token: designTokens }}>
@@ -594,32 +635,37 @@ const ThemeConfig = () => {
         <Router>
           <Suspense fallback={<PageLoading />}>
             <Routes>
-            <Route path="/login" element={<Login />} />
-            {routeConfig.map(({ path, component: Component }) => (
               <Route
-                key={path}
-                path={path}
+                path="/login"
+                element={
+                  <ErrorBoundary fullPage>
+                    <Login />
+                  </ErrorBoundary>
+                }
+              />
+              {routeConfig.map(({ path, component: Component }) =>
+                renderRoute(path, Component)
+              )}
+              <Route
+                path="/visualization-3d"
                 element={
                   <PrivateRoute>
-                    <Component />
+                    <ErrorBoundary
+                      fullPage={false}
+                      title="3D 可视化加载失败"
+                      subTitle="3D 场景在加载过程中遇到错误，可能是浏览器不支持 WebGL 或模型文件加载失败"
+                    >
+                      <Scene3DProvider>
+                        <Rack3DVisualization />
+                      </Scene3DProvider>
+                    </ErrorBoundary>
                   </PrivateRoute>
                 }
               />
-            ))}
-            <Route
-              path="/visualization-3d"
-              element={
-                <PrivateRoute>
-                  <Scene3DProvider>
-                    <Rack3DVisualization />
-                  </Scene3DProvider>
-                </PrivateRoute>
-              }
-            />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </Suspense>
-      </Router>
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Suspense>
+        </Router>
       </SWRConfig>
     </AntdConfigProvider>
   );

@@ -4,6 +4,7 @@ import { DatabaseOutlined, CloudServerOutlined, WarningOutlined, HomeOutlined, T
 import api from '../api';
 import { designTokens } from '../config/theme';
 import { useFetch } from '../hooks/useSWR';
+import ErrorBoundary from '../components/ErrorBoundary';
 import {
   AnimatedCounter,
   CircularProgress,
@@ -380,14 +381,30 @@ function Dashboard() {
                     gap: '24px',
                   }}
                 >
-                  <CircularProgress
-                    percentage={parseFloat(stats.onlineRate)}
-                    size={140}
-                    strokeWidth={12}
-                    color={designTokens.colors.success.main}
-                    label="在线率"
-                  />
-                  <PowerGauge value={stats.powerUsage} maxValue={10000} />
+                  <ErrorBoundary
+                    fallback={
+                      <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>
+                        在线率图表加载失败
+                      </div>
+                    }
+                  >
+                    <CircularProgress
+                      percentage={parseFloat(stats.onlineRate)}
+                      size={140}
+                      strokeWidth={12}
+                      color={designTokens.colors.success.main}
+                      label="在线率"
+                    />
+                  </ErrorBoundary>
+                  <ErrorBoundary
+                    fallback={
+                      <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>
+                        功率仪表加载失败
+                      </div>
+                    }
+                  >
+                    <PowerGauge value={stats.powerUsage} maxValue={10000} />
+                  </ErrorBoundary>
                 </div>
               </div>
             </Card>
@@ -403,7 +420,15 @@ function Dashboard() {
                   周设备趋势
                 </Title>
                 <div style={chartContainerStyle}>
-                  <DeviceTrendChart data={deviceTrendData} />
+                  <ErrorBoundary
+                    fallback={
+                      <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>
+                        趋势图表加载失败
+                      </div>
+                    }
+                  >
+                    <DeviceTrendChart data={deviceTrendData} />
+                  </ErrorBoundary>
                 </div>
                 <div
                   style={{

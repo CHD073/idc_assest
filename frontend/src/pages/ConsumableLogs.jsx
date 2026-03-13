@@ -245,16 +245,17 @@ function ConsumableLogs() {
       key: 'snList',
       width: 150,
       render: (snList, record) => {
-        if (!snList || snList.length === 0) {
+        const snListArray = Array.isArray(snList) ? snList : [];
+        if (!snListArray || snListArray.length === 0) {
           return '-';
         }
         if (record.operationType !== 'in' && record.operationType !== 'out') {
           return '-';
         }
-        if (snList.length <= 3) {
+        if (snListArray.length <= 3) {
           return (
             <Space size={2} wrap>
-              {snList.map((sn, index) => (
+              {snListArray.map((sn, index) => (
                 <Tag key={index} color="purple" style={{ fontSize: '11px' }}>
                   {sn}
                 </Tag>
@@ -264,7 +265,7 @@ function ConsumableLogs() {
         }
         const content = (
           <div style={{ maxHeight: '200px', overflowY: 'auto', maxWidth: '300px' }}>
-            {snList.map((sn, index) => (
+            {snListArray.map((sn, index) => (
               <Tag key={index} color="purple" style={{ marginBottom: '4px', fontSize: '11px' }}>
                 {sn}
               </Tag>
@@ -272,9 +273,9 @@ function ConsumableLogs() {
           </div>
         );
         return (
-          <Popover content={content} title={`SN列表 (${snList.length}个)`} trigger="click">
+          <Popover content={content} title={`SN列表 (${snListArray.length}个)`} trigger="click">
             <Tag color="purple" style={{ cursor: 'pointer' }}>
-              {snList.length} 个SN 🔍
+              {snListArray.length} 个SN 🔍
             </Tag>
           </Popover>
         );

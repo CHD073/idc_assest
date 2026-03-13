@@ -1,4 +1,7 @@
 require('dotenv').config();
+const { ensureJwtSecret } = require('./initConfig');
+ensureJwtSecret();
+
 const express = require('express');
 const cors = require('cors');
 const fileUpload = require('express-fileupload');
@@ -117,6 +120,14 @@ async function initFaultCategories() {
   console.log('故障分类初始化完成');
 }
 
+async function initAutoBackupScheduler() {
+  const { initAutoBackup } = require('./utils/autoBackupScheduler');
+  const status = initAutoBackup();
+  if (status.enabled) {
+    console.log(`自动备份已启用，下次执行时间：${status.nextRun || '未知'}`);
+  }
+}
+
 async function initializeApp() {
   try {
     await syncDatabase();
@@ -128,6 +139,7 @@ async function initializeApp() {
     await syncInventoryModels();
     await initDefaultSystemSettings();
     await initFaultCategories();
+    await initAutoBackupScheduler();
 
     console.log('所有初始化完成，服务器准备就绪');
   } catch (error) {
@@ -157,6 +169,7 @@ const cableRoutes = require('./routes/cables');
 const devicePortRoutes = require('./routes/devicePorts');
 const networkCardRoutes = require('./routes/networkCards');
 const inventoryRoutes = require('./routes/inventory');
+const backupRoutes = require('./routes/backup');
 
 app.use('/api/devices', deviceRoutes);
 app.use('/api/racks', rackRoutes);
@@ -177,6 +190,7 @@ app.use('/api/cables', cableRoutes);
 app.use('/api/device-ports', devicePortRoutes);
 app.use('/api/network-cards', networkCardRoutes);
 app.use('/api/inventory', inventoryRoutes);
+app.use('/api/backup', backupRoutes);
 
 app.use('/uploads', express.static('uploads'));
 

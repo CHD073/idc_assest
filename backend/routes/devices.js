@@ -15,6 +15,7 @@ const Ticket = require('../models/Ticket');
 const DevicePort = require('../models/DevicePort');
 const Cable = require('../models/Cable');
 const NetworkCard = require('../models/NetworkCard');
+const InventoryRecord = require('../models/InventoryRecord');
 const { validateBody, validateQuery } = require('../middleware/validation');
 const {
   createDeviceSchema,
@@ -1043,14 +1044,14 @@ router.put('/:deviceId', validateBody(updateDeviceSchema), async (req, res) => {
 });
 
 // 批量删除设备
-router.delete('/batch-delete', validateBody(batchDeviceIdsSchema), async (req, res) => {
+router.post('/batch-delete', validateBody(batchDeviceIdsSchema), async (req, res) => {
   const t = await sequelize.transaction();
   try {
     const { deviceIds } = req.body;
     
     if (!deviceIds || !Array.isArray(deviceIds) || deviceIds.length === 0) {
       await t.rollback();
-      return res.status(400).json({ error: '请提供有效的设备ID列表' });
+      return res.status(400).json({ error: '请提供有效的设备 ID 列表' });
     }
     
     const devices = await Device.findAll({
@@ -1058,7 +1059,19 @@ router.delete('/batch-delete', validateBody(batchDeviceIdsSchema), async (req, r
       transaction: t
     });
     
-    // 1. 删除相关接线 (Delete associated Cables)
+    // 1. 删除相关端口 (必须在网卡之前删除，因为端口依赖网卡)
+    await DevicePort.destroy({
+      where: { deviceId: { [Op.in]: deviceIds } },
+      transaction: t
+    });
+
+    // 2. 删除相关网卡
+    await NetworkCard.destroy({
+      where: { deviceId: { [Op.in]: deviceIds } },
+      transaction: t
+    });
+
+    // 3. 删除相关接线
     await Cable.destroy({
       where: {
         [Op.or]: [
@@ -1068,18 +1081,6 @@ router.delete('/batch-delete', validateBody(batchDeviceIdsSchema), async (req, r
       },
       transaction: t
     });
-
-    // 2. 删除相关网卡 (Delete associated NetworkCards)
-    await NetworkCard.destroy({
-      where: { deviceId: { [Op.in]: deviceIds } },
-      transaction: t
-    });
-
-    // 3. 删除相关端口 (Delete associated DevicePorts)
-    await DevicePort.destroy({
-      where: { deviceId: { [Op.in]: deviceIds } },
-      transaction: t
-    });
     
     // 4. 解除工单关联
     await Ticket.update(
@@ -1087,13 +1088,13 @@ router.delete('/batch-delete', validateBody(batchDeviceIdsSchema), async (req, r
       { where: { deviceId: { [Op.in]: deviceIds } }, transaction: t }
     );
     
-    // 5. 删除设备
-    const deletedCount = await Device.destroy({
+    // 5. 删除盘点记录
+    await InventoryRecord.destroy({
       where: { deviceId: { [Op.in]: deviceIds } },
       transaction: t
     });
     
-    // 更新机柜功率
+    // 6. 更新机柜功率
     for (const device of devices) {
       if (device.rackId) {
         const rack = await Rack.findByPk(device.rackId, { transaction: t });
@@ -1104,6 +1105,12 @@ router.delete('/batch-delete', validateBody(batchDeviceIdsSchema), async (req, r
         }
       }
     }
+    
+    // 7. 删除设备
+    const deletedCount = await Device.destroy({
+      where: { deviceId: { [Op.in]: deviceIds } },
+      transaction: t
+    });
 
     await t.commit();
     
@@ -1132,7 +1139,19 @@ router.delete('/delete-all', async (req, res) => {
     
     const deviceIds = allDevices.map(d => d.deviceId);
     
-    // 1. 删除相关接线
+    // 1. 删除相关端口
+    await DevicePort.destroy({
+      where: { deviceId: { [Op.in]: deviceIds } },
+      transaction: t
+    });
+    
+    // 2. 删除相关网卡
+    await NetworkCard.destroy({
+      where: { deviceId: { [Op.in]: deviceIds } },
+      transaction: t
+    });
+    
+    // 3. 删除相关接线
     await Cable.destroy({
       where: {
         [Op.or]: [
@@ -1143,25 +1162,19 @@ router.delete('/delete-all', async (req, res) => {
       transaction: t
     });
     
-    // 2. 删除相关网卡
-    await NetworkCard.destroy({
-      where: { deviceId: { [Op.in]: deviceIds } },
-      transaction: t
-    });
-    
-    // 3. 删除相关端口
-    await DevicePort.destroy({
-      where: { deviceId: { [Op.in]: deviceIds } },
-      transaction: t
-    });
-    
     // 4. 解除工单关联
     await Ticket.update(
       { deviceId: null },
       { where: { deviceId: { [Op.in]: deviceIds } }, transaction: t }
     );
     
-    // 5. 更新机柜功率
+    // 5. 删除盘点记录
+    await InventoryRecord.destroy({
+      where: { deviceId: { [Op.in]: deviceIds } },
+      transaction: t
+    });
+    
+    // 6. 更新机柜功率
     for (const device of allDevices) {
       if (device.rackId) {
         const rack = await Rack.findByPk(device.rackId, { transaction: t });
@@ -1173,7 +1186,7 @@ router.delete('/delete-all', async (req, res) => {
       }
     }
     
-    // 6. 删除所有设备
+    // 7. 删除所有设备
     const deletedCount = await Device.destroy({
       where: {},
       transaction: t
@@ -1205,7 +1218,19 @@ router.delete('/:deviceId', async (req, res) => {
       return res.status(404).json({ error: '设备不存在' });
     }
     
-    // 1. 删除相关接线 (Delete associated Cables)
+    // 1. 删除相关端口 (必须在网卡之前删除，因为端口依赖网卡)
+    const deletedPorts = await DevicePort.destroy({
+      where: { deviceId: deviceId },
+      transaction: t
+    });
+    
+    // 2. 删除相关网卡
+    const deletedNetworkCards = await NetworkCard.destroy({
+      where: { deviceId: deviceId },
+      transaction: t
+    });
+
+    // 3. 删除相关接线
     // 必须在删除设备之前删除，否则可能触发外键约束错误
     const deletedCables = await Cable.destroy({
       where: {
@@ -1216,19 +1241,6 @@ router.delete('/:deviceId', async (req, res) => {
       },
       transaction: t
     });
-    
-    // 2. 删除相关网卡 (Delete associated NetworkCards)
-    const deletedNetworkCards = await NetworkCard.destroy({
-      where: { deviceId: deviceId },
-      transaction: t
-    });
-
-    // 3. 删除相关端口 (Delete associated DevicePorts)
-    // 必须在删除设备之前删除，否则触发外键约束错误
-    const deletedPorts = await DevicePort.destroy({
-      where: { deviceId: deviceId },
-      transaction: t
-    });
 
     // 4. 解除工单关联 (Unlink Tickets)
     await Ticket.update(
@@ -1236,7 +1248,13 @@ router.delete('/:deviceId', async (req, res) => {
       { where: { deviceId: deviceId }, transaction: t }
     );
     
-    // 5. 更新机柜功率 (必须在删除设备之前)
+    // 5. 删除盘点记录
+    await InventoryRecord.destroy({
+      where: { deviceId: deviceId },
+      transaction: t
+    });
+    
+    // 6. 更新机柜功率 (必须在删除设备之前)
     if (device.rackId) {
       try {
         const rack = await Rack.findByPk(device.rackId, { transaction: t });
@@ -1251,7 +1269,7 @@ router.delete('/:deviceId', async (req, res) => {
       }
     }
     
-    // 6. 删除设备 (Delete Device)
+    // 7. 删除设备 (Delete Device)
     await Device.destroy({
       where: { deviceId: deviceId },
       transaction: t

@@ -11,7 +11,7 @@ module.exports = {
   },
   
   FILE_UPLOAD: {
-    MAX_FILE_SIZE: (parseInt(process.env.MAX_FILE_SIZE_MB, 10) || 50) * 1024 * 1024,
+    MAX_FILE_SIZE: (parseInt(process.env.MAX_FILE_SIZE_MB, 10) || 500) * 1024 * 1024,
     MAX_AVATAR_SIZE: (parseInt(process.env.MAX_AVATAR_SIZE_MB, 10) || 5) * 1024 * 1024,
     ALLOWED_IMAGE_TYPES: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
     ALLOWED_DOC_TYPES: [

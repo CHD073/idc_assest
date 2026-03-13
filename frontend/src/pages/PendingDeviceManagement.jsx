@@ -392,7 +392,7 @@ const PendingDeviceManagement = () => {
           rules={required ? [{ required: true, message: `请选择${displayName}` }] : []}
         >
           <Select placeholder={`请选择${displayName}`}>
-            {(options || [
+            {(Array.isArray(options) ? options : [
               { value: 'server', label: '服务器' },
               { value: 'switch', label: '交换机' },
               { value: 'router', label: '路由器' },
@@ -417,7 +417,7 @@ const PendingDeviceManagement = () => {
           rules={required ? [{ required: true, message: `请选择${displayName}` }] : []}
         >
           <Select placeholder={`请选择${displayName}`} allowClear>
-            {(options || []).map(opt => (
+            {(Array.isArray(options) ? options : []).map(opt => (
               <Select.Option key={opt.value} value={opt.value}>
                 {opt.label}
               </Select.Option>

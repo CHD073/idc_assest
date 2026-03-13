@@ -1,16 +1,9 @@
 const jwt = require('jsonwebtoken');
-const crypto = require('crypto');
 const User = require('../models/User');
 
-/**
- * 获取 JWT Secret
- * - 生产环境：强制从环境变量读取，未设置则抛出错误
- * - 开发环境：未设置时自动生成临时密钥（重启后失效）
- */
 function getJwtSecret() {
   const envSecret = process.env.JWT_SECRET;
 
-  // 生产环境强制校验
   if (process.env.NODE_ENV === 'production') {
     if (!envSecret) {
       throw new Error(
@@ -25,11 +18,10 @@ function getJwtSecret() {
     return envSecret;
   }
 
-  // 开发环境：使用环境变量或临时密钥
   if (!envSecret) {
-    const tempSecret = crypto.randomBytes(32).toString('hex');
-    console.warn('⚠️  [开发模式] JWT_SECRET 未设置，使用临时密钥（重启后所有 Token 失效）');
-    return tempSecret;
+    throw new Error(
+      '[错误] JWT_SECRET 未配置，请检查 initConfig.js 是否正确执行'
+    );
   }
 
   return envSecret;
