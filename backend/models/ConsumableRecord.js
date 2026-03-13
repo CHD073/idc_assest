@@ -7,8 +7,7 @@ const ConsumableRecord = sequelize.define('ConsumableRecord', {
     type: DataTypes.UUID,
     primaryKey: true,
     defaultValue: DataTypes.UUIDV4,
-    allowNull: false,
-    unique: true
+    allowNull: false
   },
   consumableId: {
     type: DataTypes.STRING,

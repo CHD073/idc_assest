@@ -22,6 +22,16 @@ const {
   updateAutoBackupSettings,
   executeBackupNow,
 } = require('../utils/autoBackupScheduler');
+const {
+  getAllTargets,
+  getTarget,
+  addTarget,
+  updateTarget,
+  deleteTarget,
+  getGlobalSettings,
+  updateGlobalSettings,
+} = require('../utils/remoteBackupConfig');
+const { testRemoteConnection, PROTOCOL_TYPES, PROTOCOL_LABELS } = require('../utils/remoteBackup');
 
 const tempDir = path.join(__dirname, '..', 'temp');
 if (!fs.existsSync(tempDir)) {
@@ -543,6 +553,302 @@ router.post('/auto/test-cron', (req, res) => {
     res.status(500).json({
       success: false,
       message: '测试 Cron 表达式失败',
+      error: error.message,
+    });
+  }
+});
+
+// ==================== 远端备份配置路由 ====================
+
+// 获取所有远端备份目标
+router.get('/remote/targets', (req, res) => {
+  try {
+    const targets = getAllTargets();
+    res.json({
+      success: true,
+      data: { targets },
+    });
+  } catch (error) {
+    console.error('获取远端备份目标失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '获取远端备份目标失败',
+      error: error.message,
+    });
+  }
+});
+
+// 获取单个远端备份目标
+router.get('/remote/targets/:id', (req, res) => {
+  try {
+    const target = getTarget(req.params.id);
+    
+    if (!target) {
+      return res.status(404).json({
+        success: false,
+        message: '目标不存在',
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: { target },
+    });
+  } catch (error) {
+    console.error('获取远端备份目标失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '获取远端备份目标失败',
+      error: error.message,
+    });
+  }
+});
+
+// 添加远端备份目标
+router.post('/remote/targets', (req, res) => {
+  try {
+    const targetData = req.body;
+    
+    if (!targetData.name || !targetData.protocol) {
+      return res.status(400).json({
+        success: false,
+        message: '请提供目标名称和协议类型',
+      });
+    }
+    
+    const target = addTarget(targetData);
+    
+    res.status(201).json({
+      success: true,
+      message: '远端备份目标已添加',
+      data: { target },
+    });
+  } catch (error) {
+    console.error('添加远端备份目标失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '添加远端备份目标失败',
+      error: error.message,
+    });
+  }
+});
+
+// 更新远端备份目标
+router.put('/remote/targets/:id', (req, res) => {
+  try {
+    const updates = req.body;
+    const target = updateTarget(req.params.id, updates);
+    
+    res.json({
+      success: true,
+      message: '远端备份目标已更新',
+      data: { target },
+    });
+  } catch (error) {
+    console.error('更新远端备份目标失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '更新远端备份目标失败',
+      error: error.message,
+    });
+  }
+});
+
+// 删除远端备份目标
+router.delete('/remote/targets/:id', (req, res) => {
+  try {
+    const deleted = deleteTarget(req.params.id);
+    
+    if (!deleted) {
+      return res.status(404).json({
+        success: false,
+        message: '目标不存在',
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: '远端备份目标已删除',
+    });
+  } catch (error) {
+    console.error('删除远端备份目标失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '删除远端备份目标失败',
+      error: error.message,
+    });
+  }
+});
+
+// 测试远端连接
+router.post('/remote/targets/:id/test', async (req, res) => {
+  try {
+    const target = getTarget(req.params.id);
+    
+    if (!target) {
+      return res.status(404).json({
+        success: false,
+        message: '目标不存在',
+      });
+    }
+    
+    const result = await testRemoteConnection(target);
+    
+    if (result.success) {
+      res.json({
+        success: true,
+        message: '连接测试成功',
+        data: result,
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        message: result.message,
+        error: result.error,
+      });
+    }
+  } catch (error) {
+    console.error('测试远端连接失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '测试远端连接失败',
+      error: error.message,
+    });
+  }
+});
+
+// 获取远端备份全局设置
+router.get('/remote/settings', (req, res) => {
+  try {
+    const settings = getGlobalSettings();
+    res.json({
+      success: true,
+      data: { settings },
+    });
+  } catch (error) {
+    console.error('获取远端备份设置失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '获取远端备份设置失败',
+      error: error.message,
+    });
+  }
+});
+
+// 更新远端备份全局设置
+router.put('/remote/settings', (req, res) => {
+  try {
+    const settings = updateGlobalSettings(req.body);
+    res.json({
+      success: true,
+      message: '远端备份设置已更新',
+      data: { settings },
+    });
+  } catch (error) {
+    console.error('更新远端备份设置失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '更新远端备份设置失败',
+      error: error.message,
+    });
+  }
+});
+
+// 获取支持的协议列表
+router.get('/remote/protocols', (req, res) => {
+  try {
+    const protocols = Object.entries(PROTOCOL_TYPES).map(([key, value]) => ({
+      key,
+      value,
+      label: PROTOCOL_LABELS[value],
+    }));
+    
+    res.json({
+      success: true,
+      data: { protocols },
+    });
+  } catch (error) {
+    console.error('获取协议列表失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '获取协议列表失败',
+      error: error.message,
+    });
+  }
+});
+
+// 手动上传备份到远端
+router.post('/remote/upload', async (req, res) => {
+  try {
+    const { filename, targetIds } = req.body;
+    
+    if (!filename) {
+      return res.status(400).json({
+        success: false,
+        message: '请提供备份文件名',
+      });
+    }
+    
+    const backupPath = getBackupPath();
+    const filePath = path.join(backupPath, filename);
+    
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({
+        success: false,
+        message: '备份文件不存在',
+      });
+    }
+    
+    const { uploadToRemote } = require('../utils/remoteBackup');
+    const { getTarget } = require('../utils/remoteBackupConfig');
+    
+    const targets = targetIds 
+      ? targetIds.map(id => getTarget(id)).filter(Boolean)
+      : getEnabledTargets();
+    
+    if (targets.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: '没有可用的远端目标',
+      });
+    }
+    
+    const uploadResults = [];
+    
+    for (const target of targets) {
+      try {
+        const remotePath = `${target.prefix || 'backups/'}${filename}`;
+        const result = await uploadToRemote(target, filePath, remotePath);
+        
+        uploadResults.push({
+          targetId: target.id,
+          targetName: target.name,
+          success: true,
+          ...result,
+        });
+      } catch (error) {
+        uploadResults.push({
+          targetId: target.id,
+          targetName: target.name,
+          success: false,
+          error: error.message,
+        });
+      }
+    }
+    
+    res.json({
+      success: true,
+      message: '上传完成',
+      data: { 
+        filename,
+        results: uploadResults,
+      },
+    });
+  } catch (error) {
+    console.error('手动上传备份失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '手动上传备份失败',
       error: error.message,
     });
   }

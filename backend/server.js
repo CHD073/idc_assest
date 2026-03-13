@@ -56,7 +56,7 @@ async function syncConsumableModels() {
   const ConsumableLogArchive = require('./models/ConsumableLogArchive');
 
   await Promise.all([
-    Consumable.sync({ alter: true }),
+    Consumable.sync(), // 暂时禁用 alter 模式
     ConsumableLog.sync(),
     ConsumableCategory.sync(),
     ConsumableRecord.sync(),

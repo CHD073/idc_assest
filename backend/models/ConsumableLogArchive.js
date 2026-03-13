@@ -14,7 +14,6 @@ const ConsumableLogArchive = sequelize.define('ConsumableLogArchive', {
   archiveId: {
     type: DataTypes.STRING,
     allowNull: false,
-    unique: true,
     comment: '归档记录唯一标识'
   },
   consumableId: {

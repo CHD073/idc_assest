@@ -5,8 +5,7 @@ const Consumable = sequelize.define('Consumable', {
   consumableId: {
     type: DataTypes.STRING,
     primaryKey: true,
-    allowNull: false,
-    unique: true
+    allowNull: false
   },
   name: {
     type: DataTypes.STRING,

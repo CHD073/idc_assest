@@ -7,6 +7,8 @@ const cron = require('node-cron');
 const path = require('path');
 const fs = require('fs');
 const { createBackup, createIncrementalBackup, getBackupPath } = require('./backup');
+const { uploadToRemote } = require('./remoteBackup');
+const { getEnabledTargets, getGlobalSettings } = require('./remoteBackupConfig');
 
 // 全局调度器存储
 const schedulers = new Map();
@@ -108,6 +110,10 @@ function createAutoBackupTask(settings) {
       if (result) {
         console.log('自动备份完成:', result.filename);
         console.log(`备份类型：${result.isIncremental ? '增量备份' : '全量备份'}`);
+        
+        // 上传到远端
+        await uploadToRemoteTargets(result.path, result.filename);
+        
         console.log('========================\n');
       } else {
         console.log('无数据变化，跳过备份');
@@ -235,6 +241,69 @@ function updateAutoBackupSettings(newSettings) {
 }
 
 /**
+ * 上传备份到所有启用的远端目标
+ */
+async function uploadToRemoteTargets(localFilePath, filename) {
+  const globalSettings = getGlobalSettings();
+  
+  if (!globalSettings.enabled || !globalSettings.uploadAfterBackup) {
+    console.log('远端备份已禁用');
+    return [];
+  }
+  
+  const enabledTargets = getEnabledTargets();
+  
+  if (enabledTargets.length === 0) {
+    console.log('没有启用的远端备份目标');
+    return [];
+  }
+  
+  const uploadResults = [];
+  
+  for (const target of enabledTargets) {
+    try {
+      console.log(`开始上传到目标：${target.name} (${target.protocol})`);
+      
+      const remotePath = `${target.prefix || 'backups/'}${filename}`;
+      
+      const result = await uploadToRemote(target, localFilePath, remotePath);
+      
+      uploadResults.push({
+        targetId: target.id,
+        targetName: target.name,
+        protocol: target.protocol,
+        success: true,
+        ...result,
+      });
+      
+      console.log(`上传到 ${target.name} 成功`);
+    } catch (error) {
+      console.error(`上传到 ${target.name} 失败:`, error.message);
+      uploadResults.push({
+        targetId: target.id,
+        targetName: target.name,
+        protocol: target.protocol,
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+  
+  // 检查是否需要删除本地文件
+  const settings = getGlobalSettings();
+  if (settings.deleteLocalAfterUpload && uploadResults.every(r => r.success)) {
+    try {
+      fs.unlinkSync(localFilePath);
+      console.log('本地备份文件已删除');
+    } catch (error) {
+      console.error('删除本地备份文件失败:', error.message);
+    }
+  }
+  
+  return uploadResults;
+}
+
+/**
  * 立即执行一次备份
  */
 async function executeBackupNow(options = {}) {
@@ -251,8 +320,16 @@ async function executeBackupNow(options = {}) {
     });
 
     console.log('手动备份完成:', result.filename);
+    
+    // 上传到远端
+    const uploadResults = await uploadToRemoteTargets(result.path, result.filename);
+    
     console.log('====================\n');
-    return { success: true, result };
+    return { 
+      success: true, 
+      result,
+      remoteUploads: uploadResults,
+    };
   } catch (error) {
     console.error('手动备份失败:', error);
     console.error('====================\n');

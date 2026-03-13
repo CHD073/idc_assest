@@ -79,6 +79,7 @@ const InventoryTaskExecution = lazy(() => import('./pages/InventoryTaskExecution
 const PendingDeviceManagement = lazy(() => import('./pages/PendingDeviceManagement'));
 const BackupManagement = lazy(() => import('./pages/BackupManagement'));
 const AutoBackupSettings = lazy(() => import('./pages/AutoBackupSettings'));
+const RemoteBackupSettings = lazy(() => import('./pages/RemoteBackupSettings'));
 const ErrorBoundaryTest = lazy(() => import('./pages/ErrorBoundaryTest'));
 
 const { Header, Content, Sider } = Layout;
@@ -595,6 +596,7 @@ const routeConfig = [
   { path: '/ports', component: PortManagement },
   { path: '/backup', component: BackupManagement },
   { path: '/auto-backup-settings', component: AutoBackupSettings },
+  { path: '/remote-backup-settings', component: RemoteBackupSettings },
   { path: '/error-boundary-test', component: ErrorBoundaryTest },
 ];
 

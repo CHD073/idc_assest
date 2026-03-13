@@ -18,10 +18,12 @@ import {
   Statistic,
   Row,
   Col,
+  Dropdown,
 } from 'antd';
 import {
   CloudDownloadOutlined,
   CloudUploadOutlined,
+  CloudOutlined,
   DeleteOutlined,
   DownloadOutlined,
   UploadOutlined,
@@ -33,6 +35,11 @@ import {
   ExclamationCircleOutlined,
   InfoCircleOutlined,
   SettingOutlined,
+  MoreOutlined,
+  SafetyOutlined,
+  PlusOutlined,
+  ClearOutlined,
+  EyeOutlined,
 } from '@ant-design/icons';
 import api, { backupAPI } from '../api';
 import CloseButton from '../components/CloseButton';
@@ -70,6 +77,7 @@ const designTokens = {
     warning: {
       main: '#f59e0b',
       light: '#fbbf24',
+      gradient: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)',
     },
     danger: {
       main: '#ef4444',
@@ -85,6 +93,11 @@ const designTokens = {
       primary: '#1e293b',
       secondary: '#64748b',
       muted: '#94a3b8',
+    },
+    border: {
+      light: '#e2e8f0',
+      medium: '#cbd5e1',
+      dark: '#94a3b8',
     },
   },
   shadows: {
@@ -998,86 +1011,75 @@ const BackupManagement = () => {
     {
       title: <span style={{ fontWeight: 600, color: designTokens.colors.text.primary }}>操作</span>,
       key: 'action',
-      width: 320,
+      width: 280,
       render: (_, record) => (
-        <Space size="small">
-          <Tooltip title="验证备份">
+        <Space size={4}>
+          <Tooltip title="验证备份完整性">
             <Button
-              shape="circle"
-              icon={<CheckCircleOutlined style={{ fontSize: 16 }} />}
+              size="small"
+              icon={<SafetyOutlined />}
               onClick={() => handleValidate(record.filename)}
               style={{
-                border: 'none',
-                background: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)',
-                color: '#fff',
-                boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)',
-                width: 36,
-                height: 36,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
+                ...buttonStyles.success.base,
+                padding: '4px 12px',
+                height: '32px',
+                fontSize: '13px',
+                background: record.invalid ? designTokens.colors.text.muted : designTokens.colors.success.gradient,
               }}
               disabled={record.invalid}
-            />
+            >
+              验证
+            </Button>
           </Tooltip>
-          <Tooltip title="下载备份">
+          <Tooltip title="下载备份文件">
             <Button
-              shape="circle"
-              icon={<DownloadOutlined style={{ fontSize: 16 }} />}
+              size="small"
+              icon={<DownloadOutlined />}
               onClick={() => handleDownload(record.filename)}
               style={{
-                border: 'none',
-                background: designTokens.colors.primary.gradient,
-                color: '#fff',
-                boxShadow: '0 2px 8px rgba(102, 126, 234, 0.3)',
-                width: 36,
-                height: 36,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
+                ...buttonStyles.secondary.base,
+                padding: '4px 12px',
+                height: '32px',
+                fontSize: '13px',
               }}
               disabled={record.invalid}
-            />
+            >
+              下载
+            </Button>
           </Tooltip>
-          <Tooltip title="恢复数据">
+          <Tooltip title="恢复备份数据">
             <Button
-              shape="circle"
-              icon={<CloudUploadOutlined style={{ fontSize: 16 }} />}
+              size="small"
+              icon={<CloudUploadOutlined />}
               onClick={() => showRestoreConfirm(record)}
               style={{
-                border: 'none',
-                background: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)',
-                color: '#fff',
-                boxShadow: '0 2px 8px rgba(245, 158, 11, 0.3)',
-                width: 36,
-                height: 36,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
+                ...buttonStyles.warning.base,
+                padding: '4px 12px',
+                height: '32px',
+                fontSize: '13px',
+                background: record.invalid ? designTokens.colors.text.muted : designTokens.colors.warning.gradient,
               }}
               disabled={record.invalid}
-            />
+            >
+              恢复
+            </Button>
           </Tooltip>
           <Popconfirm
             title="确定要删除此备份文件吗？"
+            description="此操作不可撤销"
             onConfirm={() => handleDelete(record.filename)}
             okText="确定"
             cancelText="取消"
+            okButtonProps={{ danger: true }}
           >
-            <Tooltip title="删除备份">
+            <Tooltip title="删除备份文件">
               <Button
-                shape="circle"
-                icon={<DeleteOutlined style={{ fontSize: 16 }} />}
+                size="small"
+                icon={<DeleteOutlined />}
                 style={{
-                  border: 'none',
-                  background: designTokens.colors.danger.gradient,
-                  color: '#fff',
-                  boxShadow: '0 2px 8px rgba(239, 68, 68, 0.3)',
-                  width: 36,
-                  height: 36,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
+                  ...buttonStyles.icon.base,
+                  background: designTokens.colors.background.accent,
+                  color: designTokens.colors.danger.main,
                 }}
               />
             </Tooltip>
@@ -1094,22 +1096,26 @@ const BackupManagement = () => {
     padding: `${designTokens.spacing.lg} ${designTokens.spacing.lg}`,
   };
 
-  // 页面标题样式
+  // 页面标题样式 - 响应式适配
   const pageHeaderStyle = {
     marginBottom: '32px',
     display: 'flex',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     flexWrap: 'wrap',
     gap: '20px',
     padding: `${designTokens.spacing.md} ${designTokens.spacing.lg}`,
     background: designTokens.colors.background.secondary,
     borderRadius: designTokens.borderRadius.xl,
     boxShadow: designTokens.shadows.lg,
+    '@media (max-width: 768px)': {
+      flexDirection: 'column',
+      alignItems: 'stretch',
+    },
   };
 
   const titleStyle = {
-    fontSize: '28px',
+    fontSize: 'clamp(20px, 4vw, 28px)',
     fontWeight: '800',
     margin: 0,
     background: designTokens.colors.primary.gradient,
@@ -1142,44 +1148,129 @@ const BackupManagement = () => {
     display: 'flex',
     gap: '12px',
     flexWrap: 'wrap',
+    alignItems: 'center',
   };
 
-  // 主按钮样式
-  const primaryButtonStyle = {
-    background: designTokens.colors.primary.gradient,
-    border: 'none',
-    borderRadius: designTokens.borderRadius.md,
-    padding: '8px 20px',
-    fontWeight: 600,
-    boxShadow: designTokens.shadows.md,
-    transition: 'all 0.3s ease',
-    color: '#fff',
-    textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
+  // 按钮设计系统 - 统一风格
+  const buttonStyles = {
+    primary: {
+      base: {
+        background: designTokens.colors.primary.gradient,
+        border: 'none',
+        borderRadius: designTokens.borderRadius.md,
+        padding: '8px 20px',
+        fontWeight: 600,
+        boxShadow: designTokens.shadows.md,
+        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+        color: '#fff',
+        height: '40px',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '8px',
+      },
+      hover: {
+        transform: 'translateY(-1px)',
+        boxShadow: designTokens.shadows.lg,
+      },
+    },
+    secondary: {
+      base: {
+        background: designTokens.colors.background.secondary,
+        border: `1px solid ${designTokens.colors.border.light}`,
+        borderRadius: designTokens.borderRadius.md,
+        padding: '8px 16px',
+        fontWeight: 500,
+        color: designTokens.colors.text.primary,
+        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+        height: '40px',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '8px',
+      },
+      hover: {
+        borderColor: designTokens.colors.primary.main,
+        color: designTokens.colors.primary.main,
+        background: `${designTokens.colors.primary.main}08`,
+      },
+    },
+    danger: {
+      base: {
+        background: designTokens.colors.danger.gradient,
+        border: 'none',
+        borderRadius: designTokens.borderRadius.md,
+        padding: '8px 20px',
+        fontWeight: 600,
+        boxShadow: designTokens.shadows.md,
+        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+        color: '#fff',
+        height: '40px',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '8px',
+      },
+      hover: {
+        transform: 'translateY(-1px)',
+        boxShadow: '0 8px 16px rgba(239, 68, 68, 0.3)',
+      },
+    },
+    success: {
+      base: {
+        background: designTokens.colors.success.gradient,
+        border: 'none',
+        borderRadius: designTokens.borderRadius.md,
+        padding: '8px 20px',
+        fontWeight: 600,
+        boxShadow: designTokens.shadows.md,
+        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+        color: '#fff',
+        height: '40px',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '8px',
+      },
+      hover: {
+        transform: 'translateY(-1px)',
+        boxShadow: '0 8px 16px rgba(16, 185, 129, 0.3)',
+      },
+    },
+    warning: {
+      base: {
+        background: designTokens.colors.warning.gradient,
+        border: 'none',
+        borderRadius: designTokens.borderRadius.md,
+        padding: '8px 20px',
+        fontWeight: 600,
+        boxShadow: designTokens.shadows.md,
+        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+        color: '#fff',
+        height: '40px',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: '8px',
+      },
+      hover: {
+        transform: 'translateY(-1px)',
+        boxShadow: '0 8px 16px rgba(245, 158, 11, 0.3)',
+      },
+    },
+    icon: {
+      base: {
+        border: 'none',
+        borderRadius: designTokens.borderRadius.md,
+        width: '36px',
+        height: '36px',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
+        cursor: 'pointer',
+      },
+    },
   };
 
-  // 次要按钮样式
-  const secondaryButtonStyle = {
-    background: designTokens.colors.background.secondary,
-    border: `1px solid ${designTokens.colors.text.muted}`,
-    borderRadius: designTokens.borderRadius.md,
-    padding: '8px 20px',
-    fontWeight: 500,
-    color: designTokens.colors.text.primary,
-    transition: 'all 0.3s ease',
-  };
-
-  // 危险按钮样式
-  const dangerButtonStyle = {
-    background: designTokens.colors.danger.gradient,
-    border: 'none',
-    borderRadius: designTokens.borderRadius.md,
-    padding: '8px 20px',
-    fontWeight: 600,
-    boxShadow: designTokens.shadows.md,
-    transition: 'all 0.3s ease',
-    color: '#fff',
-    textShadow: '0 1px 2px rgba(0, 0, 0, 0.1)',
-  };
+  const primaryButtonStyle = buttonStyles.primary.base;
+  const secondaryButtonStyle = buttonStyles.secondary.base;
+  const dangerButtonStyle = buttonStyles.danger.base;
 
   return (
     <div style={containerStyle}>
@@ -1197,73 +1288,104 @@ const BackupManagement = () => {
             管理系统备份，确保数据安全与可恢复性
           </p>
         </div>
+        
         <div style={buttonGroupStyle}>
-          <Button
-            icon={<SettingOutlined />}
-            onClick={() => navigate('/auto-backup-settings')}
-            style={{
-              ...secondaryButtonStyle,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-            }}
-          >
-            自动备份设置
-          </Button>
-          <Button 
-            icon={<ReloadOutlined />} 
-            onClick={() => { fetchBackups(); fetchBackupInfo(); }}
-            style={secondaryButtonStyle}
-          >
-            刷新
-          </Button>
-          <Popconfirm
-            title="清理旧备份"
-            description={
-              <div>
-                <p>将删除超过 30 个或超过 90 天的旧备份</p>
-                <p style={{ color: designTokens.colors.text.muted, fontSize: 12 }}>建议先点击"预览"查看将删除的文件</p>
-              </div>
-            }
-            onConfirm={() => handleCleanBackups(30, 90, false)}
-            okText="确认清理"
-            cancelText="取消"
-          >
-            <Button 
-              icon={<DeleteOutlined />} 
-              danger
-              style={dangerButtonStyle}
+          <Space size="middle" wrap>
+            <Dropdown
+              menu={{
+                items: [
+                  {
+                    key: 'auto',
+                    icon: <SettingOutlined />,
+                    label: '自动备份设置',
+                    onClick: () => navigate('/auto-backup-settings'),
+                  },
+                  {
+                    key: 'remote',
+                    icon: <CloudOutlined />,
+                    label: '远端备份配置',
+                    onClick: () => navigate('/remote-backup-settings'),
+                  },
+                ],
+              }}
+              placement="bottomRight"
             >
-              清理旧备份
-            </Button>
-          </Popconfirm>
-          <Button 
-            onClick={() => handleCleanBackups(30, 90, true)}
-            style={secondaryButtonStyle}
-          >
-            预览清理
-          </Button>
-          <Upload
-            customRequest={handleUpload}
-            showUploadList={false}
-            accept=".json,.gz,.json.gz"
-          >
+              <Button 
+                icon={<SettingOutlined />}
+                style={secondaryButtonStyle}
+              >
+                设置
+              </Button>
+            </Dropdown>
+            
             <Button 
-              icon={<UploadOutlined />}
+              icon={<ReloadOutlined />} 
+              onClick={() => { fetchBackups(); fetchBackupInfo(); }}
               style={secondaryButtonStyle}
             >
-              上传备份
+              刷新
             </Button>
-          </Upload>
-          <Button
-            type="primary"
-            icon={<CloudDownloadOutlined />}
-            loading={backupLoading}
-            onClick={handleCreateBackup}
-            style={primaryButtonStyle}
-          >
-            创建备份
-          </Button>
+            
+            <Dropdown
+              menu={{
+                items: [
+                  {
+                    key: 'preview',
+                    icon: <EyeOutlined />,
+                    label: '预览清理',
+                    onClick: () => handleCleanBackups(30, 90, true),
+                  },
+                  {
+                    key: 'clean',
+                    icon: <ClearOutlined />,
+                    label: '清理旧备份',
+                    danger: true,
+                    onClick: () => {
+                      Modal.confirm({
+                        title: '确认清理旧备份',
+                        content: '将删除超过 30 个或超过 90 天的旧备份文件，此操作不可撤销',
+                        okText: '确认清理',
+                        cancelText: '取消',
+                        okButtonProps: { style: dangerButtonStyle },
+                        onOk: () => handleCleanBackups(30, 90, false),
+                      });
+                    },
+                  },
+                ],
+              }}
+              placement="bottomRight"
+            >
+              <Button 
+                icon={<ClearOutlined />}
+                style={secondaryButtonStyle}
+              >
+                清理
+              </Button>
+            </Dropdown>
+            
+            <Upload
+              customRequest={handleUpload}
+              showUploadList={false}
+              accept=".json,.gz,.json.gz"
+            >
+              <Button 
+                icon={<UploadOutlined />}
+                style={secondaryButtonStyle}
+              >
+                上传备份
+              </Button>
+            </Upload>
+            
+            <Button
+              type="primary"
+              icon={<PlusOutlined />}
+              loading={backupLoading}
+              onClick={handleCreateBackup}
+              style={primaryButtonStyle}
+            >
+              创建备份
+            </Button>
+          </Space>
         </div>
       </div>
 
@@ -1638,7 +1760,12 @@ const BackupManagement = () => {
 
               <Divider style={{ margin: '20px 0' }} />
 
-              <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'flex-end', 
+                gap: '12px',
+                marginTop: '8px',
+              }}>
                 <Button 
                   onClick={() => setRestoreVisible(false)}
                   style={secondaryButtonStyle}
@@ -1649,15 +1776,16 @@ const BackupManagement = () => {
                 <Button
                   type="primary"
                   danger
+                  icon={<CloudUploadOutlined />}
                   onClick={() => handleRestore(selectedBackup?.filename)}
                   style={{
-                    ...dangerButtonStyle,
-                    padding: '8px 32px',
+                    ...buttonStyles.danger.base,
+                    padding: '8px 24px',
                   }}
                 >
                   确认恢复
                 </Button>
-              </Space>
+              </div>
             </>
           )}
         </div>
