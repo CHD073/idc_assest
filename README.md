@@ -37,17 +37,29 @@
 
 ### 项目截图
 
-![数据看板](docs/images/dashboard.png)
+![数据看板](docs/images/dashboard-full.png)
 *数据看板 - 实时监控数据中心运行状态*
 
-![3D机柜可视化](docs/images/3d-visualization.png)
+![3D机柜可视化](docs/images/3d-visualization-full.png)
 *3D机柜可视化 - 三维展示机柜设备布局*
 
-![设备管理](docs/images/device-management.png)
+![机房管理](docs/images/room-management-full.png)
+*机房管理 - 多机房分类管理*
+
+![机柜管理](docs/images/rack-management.png)
+*机柜管理 - 机柜容量与设备布局管理*
+
+![设备管理](docs/images/device-management-full.png)
 *设备管理 - 设备全生命周期管理*
 
-![机房管理](docs/images/room-management.png)
-*机房管理 - 多机房分类管理*
+![耗材管理](docs/images/consumable-management.png)
+*耗材管理 - 耗材库存与领用管理*
+
+![工单管理](docs/images/ticket-management.png)
+*工单管理 - 故障报修与维护工单处理*
+
+![数据备份](docs/images/backup-management.png)
+*数据备份 - 数据库备份与恢复管理*
 
 ---
 
