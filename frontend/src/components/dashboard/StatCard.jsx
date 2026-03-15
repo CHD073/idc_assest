@@ -46,6 +46,7 @@ const StatCard = ({
     trend,
     tagColor,
     customStatus,
+    hideTrend,
     xs,
     sm,
     lg,
@@ -135,7 +136,7 @@ const StatCard = ({
               />
               <span>{statKey === 'totalRacks' ? '正常运行中' : '全部在线'}</span>
             </div>
-          ) : (
+          ) : !hideTrend ? (
             <div
               style={{
                 display: 'flex',
@@ -166,7 +167,7 @@ const StatCard = ({
                 环比
               </Tag>
             </div>
-          )}
+          ) : null}
         </div>
       </Card>
     </Col>

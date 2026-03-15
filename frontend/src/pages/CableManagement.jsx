@@ -317,21 +317,6 @@ function CableManagement() {
     }
   };
 
-  const handleDeleteSwitch = async switchId => {
-    try {
-      await axios.delete(`/api/devices/${switchId}`);
-      message.success({
-        content: '删除设备成功',
-        icon: <CheckCircleOutlined style={{ color: designTokens.colors.success.main }} />,
-      });
-      fetchDevices();
-      fetchCables();
-    } catch (error) {
-      message.error('删除设备失败');
-      console.error('删除设备失败:', error);
-    }
-  };
-
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields();
@@ -662,7 +647,11 @@ function CableManagement() {
   };
 
   const getPortConnectionStatus = (portName, switchData) => {
-    const cable = switchData.cables.find(c => c.sourcePort === portName);
+    const cable = switchData.cables.find(c => {
+      if (c.sourcePort === portName) return true;
+      if (c.sourcePort?.toLowerCase() === portName?.toLowerCase()) return true;
+      return false;
+    });
     if (!cable) {
       return { status: 'disconnected', text: '未连接', color: 'default' };
     }
@@ -727,7 +716,11 @@ function CableManagement() {
       key: 'targetDevice',
       width: 200,
       render: (_, record) => {
-        const cable = record.switchData.cables.find(c => c.sourcePort === record.portName);
+        const cable = record.switchData.cables.find(c => {
+          if (c.sourcePort === record.portName) return true;
+          if (c.sourcePort?.toLowerCase() === record.portName?.toLowerCase()) return true;
+          return false;
+        });
         if (!cable) return <Text type="secondary">-</Text>;
         return (
           <div>
@@ -743,7 +736,11 @@ function CableManagement() {
       key: 'cableType',
       width: 100,
       render: (_, record) => {
-        const cable = record.switchData.cables.find(c => c.sourcePort === record.portName);
+        const cable = record.switchData.cables.find(c => {
+          if (c.sourcePort === record.portName) return true;
+          if (c.sourcePort?.toLowerCase() === record.portName?.toLowerCase()) return true;
+          return false;
+        });
         if (!cable) return <Text type="secondary">-</Text>;
         return getCableTypeTag(cable.cableType);
       },
@@ -754,7 +751,11 @@ function CableManagement() {
       key: 'cableLength',
       width: 80,
       render: (_, record) => {
-        const cable = record.switchData.cables.find(c => c.sourcePort === record.portName);
+        const cable = record.switchData.cables.find(c => {
+          if (c.sourcePort === record.portName) return true;
+          if (c.sourcePort?.toLowerCase() === record.portName?.toLowerCase()) return true;
+          return false;
+        });
         if (!cable) return <Text type="secondary">-</Text>;
         return cable.cableLength ? <Tag color="orange" style={{ borderRadius: '4px' }}>{cable.cableLength}m</Tag> : <Text type="secondary">-</Text>;
       },
@@ -762,35 +763,37 @@ function CableManagement() {
     {
       title: '操作',
       key: 'action',
-      width: 120,
-      fixed: 'right',
+      width: 160,
       render: (_, record) => {
-        const cable = record.switchData.cables.find(c => c.sourcePort === record.portName);
+        const cable = record.switchData.cables.find(c => {
+          if (c.sourcePort === record.portName) return true;
+          if (c.sourcePort?.toLowerCase() === record.portName?.toLowerCase()) return true;
+          return false;
+        });
+        if (!cable) {
+          return <Text type="secondary">-</Text>;
+        }
         return (
           <Space size="small">
-            {cable && (
-              <>
-                <Tooltip title="编辑">
-                  <Button
-                    type="text"
-                    size="small"
-                    icon={<EditOutlined />}
-                    onClick={() => handleEdit(cable)}
-                    style={{ color: designTokens.colors.primary.main }}
-                  />
-                </Tooltip>
-                <Tooltip title="删除">
-                  <Popconfirm
-                    title="确定要删除这条接线吗？"
-                    onConfirm={() => handleDelete(cable.cableId)}
-                    okText="确定"
-                    cancelText="取消"
-                  >
-                    <Button type="text" size="small" danger icon={<DeleteOutlined />} />
-                  </Popconfirm>
-                </Tooltip>
-              </>
-            )}
+            <Tooltip title="编辑">
+              <Button
+                type="text"
+                size="small"
+                icon={<EditOutlined />}
+                onClick={() => handleEdit(cable)}
+                style={{ color: designTokens.colors.primary.main }}
+              />
+            </Tooltip>
+            <Tooltip title="删除">
+              <Popconfirm
+                title="确定要删除这条接线吗？"
+                onConfirm={() => handleDelete(cable.cableId)}
+                okText="确定"
+                cancelText="取消"
+              >
+                <Button type="text" size="small" danger icon={<DeleteOutlined />} />
+              </Popconfirm>
+            </Tooltip>
           </Space>
         );
       },
@@ -1047,10 +1050,8 @@ function CableManagement() {
               activeKey={expandedKeys}
               onChange={setExpandedKeys}
               style={{ background: 'transparent', border: 'none' }}
-              expandIconPosition="end"
             >
-              <AnimatePresence>
-                {Object.entries(groupedCables).map(([switchId, switchData], index) => {
+              {Object.entries(groupedCables).map(([switchId, switchData], index) => {
                   const switchDevice = switchData.switch;
                   const switchPorts = devicePorts[switchId] || [];
                   const connectedCount = switchData.cables.filter(c => c.status === 'normal').length;
@@ -1058,147 +1059,123 @@ function CableManagement() {
                   const faultCount = switchData.cables.filter(c => c.status === 'fault').length;
 
                   return (
-                    <motion.div
+                    <Panel
                       key={switchId}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.3, delay: index * 0.05 }}
-                    >
-                      <Panel
-                        header={
-                          <div
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              width: '100%',
-                              paddingRight: '16px',
-                            }}
-                          >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                              <div
-                                style={{
-                                  width: '48px',
-                                  height: '48px',
-                                  borderRadius: designTokens.borderRadius.md,
-                                  background: designTokens.colors.primary.gradient,
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  color: '#fff',
-                                  fontSize: '24px',
-                                  boxShadow: designTokens.shadows.md,
-                                }}
-                              >
-                                <AppstoreOutlined />
+                      header={
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            width: '100%',
+                            paddingRight: '16px',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                            <div
+                              style={{
+                                width: '48px',
+                                height: '48px',
+                                borderRadius: designTokens.borderRadius.md,
+                                background: designTokens.colors.primary.gradient,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                color: '#fff',
+                                fontSize: '24px',
+                                boxShadow: designTokens.shadows.md,
+                              }}
+                            >
+                              <AppstoreOutlined />
+                            </div>
+                            <div>
+                              <div style={{ fontWeight: 600, fontSize: '16px', color: designTokens.colors.neutral[800] }}>
+                                {switchDevice?.name || '未知设备'}
                               </div>
-                              <div>
-                                <div style={{ fontWeight: 600, fontSize: '16px', color: designTokens.colors.neutral[800] }}>
-                                  {switchDevice?.name || '未知设备'}
-                                </div>
-                                <div style={{ fontSize: '13px', color: designTokens.colors.neutral[500], marginTop: '2px' }}>
-                                  {switchDevice?.deviceId || '-'} · {switchDevice?.model || '交换机'}
-                                </div>
+                              <div style={{ fontSize: '13px', color: designTokens.colors.neutral[500], marginTop: '2px' }}>
+                                {switchDevice?.deviceId || '-'} · {switchDevice?.model || '交换机'}
                               </div>
                             </div>
-                            <Space size="middle">
-                              <Tooltip title="正常连接">
-                                <Tag 
-                                  color="success" 
-                                  style={{ borderRadius: '4px', padding: '4px 12px' }}
-                                  icon={<CheckCircleOutlined />}
-                                >
-                                  {connectedCount}
-                                </Tag>
-                              </Tooltip>
-                              <Tooltip title="未连接">
-                                <Tag 
-                                  style={{ borderRadius: '4px', padding: '4px 12px' }}
-                                  icon={<DisconnectOutlined />}
-                                >
-                                  {disconnectedCount}
-                                </Tag>
-                              </Tooltip>
-                              {faultCount > 0 && (
-                                <Tooltip title="故障">
-                                  <Tag 
-                                    color="error" 
-                                    style={{ borderRadius: '4px', padding: '4px 12px' }}
-                                    icon={<ExclamationCircleOutlined />}
-                                  >
-                                    {faultCount}
-                                  </Tag>
-                                </Tooltip>
-                              )}
-                              <Tag 
-                                color="blue" 
-                                style={{ borderRadius: '4px', padding: '4px 12px', fontWeight: 500 }}
-                              >
-                                总计: {switchData.cables.length}
-                              </Tag>
-                            </Space>
                           </div>
-                        }
-                        extra={
-                          <Space size="small" onClick={e => e.stopPropagation()}>
-                            <Tooltip title="添加接线">
-                              <Button
-                                type="text"
-                                icon={<PlusOutlined />}
-                                onClick={() => {
-                                  setEditingCable(null);
-                                  form.setFieldsValue({ sourceDeviceId: switchId });
-                                  setModalVisible(true);
-                                }}
-                                style={{ color: designTokens.colors.primary.main }}
-                              />
-                            </Tooltip>
-                            <Tooltip title="删除设备">
-                              <Popconfirm
-                                title={`确定要删除交换机 ${switchDevice?.name} 吗？`}
-                                onConfirm={() => handleDeleteSwitch(switchId)}
-                                okText="确定"
-                                cancelText="取消"
+                          <Space size="middle">
+                            <Tooltip title="正常连接">
+                              <Tag 
+                                color="success" 
+                                style={{ borderRadius: '4px', padding: '4px 12px' }}
+                                icon={<CheckCircleOutlined />}
                               >
-                                <Button type="text" danger icon={<DeleteOutlined />} />
-                              </Popconfirm>
+                                {connectedCount}
+                              </Tag>
                             </Tooltip>
+                            <Tooltip title="未连接">
+                              <Tag 
+                                style={{ borderRadius: '4px', padding: '4px 12px' }}
+                                icon={<DisconnectOutlined />}
+                              >
+                                {disconnectedCount}
+                              </Tag>
+                            </Tooltip>
+                            {faultCount > 0 && (
+                              <Tooltip title="故障">
+                                <Tag 
+                                  color="error" 
+                                  style={{ borderRadius: '4px', padding: '4px 12px' }}
+                                  icon={<ExclamationCircleOutlined />}
+                                >
+                                  {faultCount}
+                                </Tag>
+                              </Tooltip>
+                            )}
+                            <Tag 
+                              color="blue" 
+                              style={{ borderRadius: '4px', padding: '4px 12px', fontWeight: 500 }}
+                            >
+                              总计: {switchData.cables.length}
+                            </Tag>
                           </Space>
-                        }
-                        style={{
-                          background: '#fff',
-                          borderRadius: designTokens.borderRadius.lg,
-                          marginBottom: '12px',
-                          border: `1px solid ${designTokens.colors.neutral[200]}`,
+                        </div>
+                      }
+                      extra={
+                        <Space size="small" onClick={e => e.stopPropagation()}>
+                          <Tooltip title="添加接线">
+                            <Button
+                              type="text"
+                              icon={<PlusOutlined />}
+                              onClick={() => {
+                                setEditingCable(null);
+                                form.setFieldsValue({ sourceDeviceId: switchId });
+                                setModalVisible(true);
+                              }}
+                              style={{ color: designTokens.colors.primary.main }}
+                            />
+                          </Tooltip>
+                        </Space>
+                      }
+                      style={{
+                        background: '#fff',
+                        borderRadius: designTokens.borderRadius.lg,
+                        marginBottom: '12px',
+                        border: `1px solid ${designTokens.colors.neutral[200]}`,
+                        overflow: 'hidden',
+                      }}
+                    >
+                      <Table
+                        columns={portColumns}
+                        dataSource={switchPorts.map(port => ({
+                          ...port,
+                          switchData: switchData,
+                        }))}
+                        rowKey="portId"
+                        pagination={false}
+                        size="middle"
+                        style={{ 
+                          borderRadius: designTokens.borderRadius.md,
                           overflow: 'hidden',
                         }}
-                      >
-                        <motion.div
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          transition={{ duration: 0.2 }}
-                        >
-                          <Table
-                            columns={portColumns}
-                            dataSource={switchPorts.map(port => ({
-                              ...port,
-                              switchData: switchData,
-                            }))}
-                            rowKey="portId"
-                            pagination={false}
-                            size="middle"
-                            scroll={{ x: 1100 }}
-                            style={{ 
-                              borderRadius: designTokens.borderRadius.md,
-                              overflow: 'hidden',
-                            }}
-                          />
-                        </motion.div>
-                      </Panel>
-                    </motion.div>
+                      />
+                    </Panel>
                   );
                 })}
-              </AnimatePresence>
             </Collapse>
           )}
         </Card>

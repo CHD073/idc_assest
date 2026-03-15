@@ -170,6 +170,7 @@ const devicePortRoutes = require('./routes/devicePorts');
 const networkCardRoutes = require('./routes/networkCards');
 const inventoryRoutes = require('./routes/inventory');
 const backupRoutes = require('./routes/backup');
+const statisticsRoutes = require('./routes/statistics');
 
 app.use('/api/devices', deviceRoutes);
 app.use('/api/racks', rackRoutes);
@@ -191,6 +192,7 @@ app.use('/api/device-ports', devicePortRoutes);
 app.use('/api/network-cards', networkCardRoutes);
 app.use('/api/inventory', inventoryRoutes);
 app.use('/api/backup', backupRoutes);
+app.use('/api/statistics', statisticsRoutes);
 
 app.use('/uploads', express.static('uploads'));
 

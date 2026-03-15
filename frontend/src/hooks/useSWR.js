@@ -5,11 +5,13 @@ const fetcher = url => api.get(url).then(res => res);
 
 export const swrConfig = {
   fetcher,
-  revalidateOnFocus: false,
+  revalidateOnFocus: true,
   revalidateOnReconnect: true,
-  shouldRetryOnError: false,
-  dedupingInterval: 5000,
+  shouldRetryOnError: true,
+  dedupingInterval: 2000,
   errorRetryCount: 2,
+  refreshInterval: 30000,
+  refreshWhenHidden: false,
 };
 
 export const useSWRConfig = () => {

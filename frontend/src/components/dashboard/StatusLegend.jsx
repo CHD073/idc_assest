@@ -4,12 +4,12 @@ import { designTokens } from '../../config/theme';
 
 const { Text } = Typography;
 
-const StatusLegend = () => {
+const StatusLegend = ({ deviceStatusPercentages }) => {
   const legends = [
-    { color: designTokens.colors.success.main, label: '运行中', percent: 60 },
-    { color: designTokens.colors.warning.main, label: '维护中', percent: 20 },
-    { color: designTokens.colors.error.main, label: '故障', percent: 10 },
-    { color: designTokens.colors.primary.main, label: '离线', percent: 10 },
+    { color: designTokens.colors.success.main, label: '运行中', percent: deviceStatusPercentages?.running ?? 0 },
+    { color: designTokens.colors.warning.main, label: '维护中', percent: deviceStatusPercentages?.maintenance ?? 0 },
+    { color: designTokens.colors.error.main, label: '故障', percent: deviceStatusPercentages?.fault ?? 0 },
+    { color: designTokens.colors.primary.main, label: '离线', percent: deviceStatusPercentages?.offline ?? 0 },
   ];
 
   return (

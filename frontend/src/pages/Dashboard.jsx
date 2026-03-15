@@ -79,22 +79,6 @@ const PIE_CHART_COLORS = {
   primary: designTokens.colors.primary.main,
 };
 
-const pieChartStyle = {
-  width: '180px',
-  height: '180px',
-  borderRadius: '50%',
-  background: `conic-gradient(
-    ${PIE_CHART_COLORS.success} 0deg 216deg,
-    ${PIE_CHART_COLORS.warning} 216deg 288deg,
-    ${PIE_CHART_COLORS.error} 288deg 324deg,
-    ${PIE_CHART_COLORS.primary} 324deg 360deg
-  )`,
-  position: 'relative',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-};
-
 const pieChartInner = {
   width: '120px',
   height: '120px',
@@ -118,50 +102,122 @@ function Dashboard() {
   const [hoveredCard, setHoveredCard] = useState(null);
   const [animatedKey, setAnimatedKey] = useState(0);
 
-  const { data: devicesData, isLoading: devicesLoading, mutate: mutateDevices } = useFetch(
-    '/devices?pageSize=1'
-  );
-  const { data: racksData, isLoading: racksLoading } = useFetch('/racks?pageSize=1');
-  const { data: roomsData, isLoading: roomsLoading } = useFetch('/rooms');
-  const { data: usersData, isLoading: usersLoading } = useFetch('/users?pageSize=1');
-  const { data: ticketsData, isLoading: ticketsLoading } = useFetch('/tickets?pageSize=1&status=open');
-  const { data: faultData, isLoading: faultLoading } = useFetch('/devices?status=fault&pageSize=1');
+  const { data: statsData, isLoading: loading, mutate: mutateStats } = useFetch('/statistics');
 
-  const loading = devicesLoading || racksLoading || roomsLoading || usersLoading || ticketsLoading;
-  const isRefreshing = devicesLoading && devicesData;
+  const isRefreshing = loading && statsData;
 
   const stats = useMemo(() => {
-    const totalDevices = devicesData?.total || 0;
-    const totalRacks = racksData?.total || 0;
-    const rooms = roomsData || [];
-    const totalRooms = Array.isArray(rooms) ? rooms.length : 0;
-    const totalUsers = usersData?.total || 0;
-    const activeTickets = ticketsData?.total || 0;
-    const faultDevices = faultData?.total || 0;
+    if (!statsData) {
+      return {
+        totalDevices: 0,
+        totalRacks: 0,
+        totalRooms: 0,
+        totalUsers: 0,
+        activeTickets: 0,
+        faultDevices: 0,
+        deviceGrowth: 0,
+        faultTrend: 0,
+        userGrowth: 0,
+        ticketTrend: 0,
+        onlineRate: 100,
+        powerUsage: 0,
+        totalMaxPower: 10000,
+        deviceStatus: {
+          running: 0,
+          maintenance: 0,
+          fault: 0,
+          offline: 0,
+        },
+        deviceTrendData: [],
+      };
+    }
 
     return {
-      totalDevices,
-      totalRacks,
-      totalRooms,
-      totalUsers,
-      activeTickets,
-      faultDevices,
-      deviceGrowth: 2.5,
-      faultTrend: -12.3,
-      onlineRate:
-        totalDevices > 0
-          ? (((totalDevices - faultDevices) / totalDevices) * 100).toFixed(1)
-          : 100,
-      powerUsage: Math.floor(Math.random() * 5000) + 2000,
+      totalDevices: statsData.totalDevices || 0,
+      totalRacks: statsData.totalRacks || 0,
+      totalRooms: statsData.totalRooms || 0,
+      totalUsers: statsData.totalUsers || 0,
+      activeTickets: statsData.activeTickets || 0,
+      faultDevices: statsData.faultDevices || 0,
+      deviceGrowth: statsData.deviceGrowth || 0,
+      faultTrend: statsData.faultTrend || 0,
+      userGrowth: statsData.userGrowth || 0,
+      ticketTrend: statsData.ticketTrend || 0,
+      onlineRate: statsData.onlineRate || 100,
+      powerUsage: statsData.powerUsage || 0,
+      totalMaxPower: statsData.totalMaxPower || 10000,
+      deviceStatus: statsData.deviceStatus || {
+        running: 0,
+        maintenance: 0,
+        fault: 0,
+        offline: 0,
+      },
+      deviceTrendData: statsData.deviceTrendData || [],
     };
-  }, [devicesData, racksData, roomsData, usersData, ticketsData, faultData]);
+  }, [statsData]);
+
+  const deviceStatusPercentages = useMemo(() => {
+    const total = stats.totalDevices;
+    if (total === 0) {
+      return {
+        running: 0,
+        maintenance: 0,
+        fault: 0,
+        offline: 0,
+      };
+    }
+
+    return {
+      running: Math.round((stats.deviceStatus.running / total) * 100),
+      maintenance: Math.round((stats.deviceStatus.maintenance / total) * 100),
+      fault: Math.round((stats.deviceStatus.fault / total) * 100),
+      offline: Math.round((stats.deviceStatus.offline / total) * 100),
+    };
+  }, [stats.totalDevices, stats.deviceStatus]);
+
+  const pieChartStyle = useMemo(() => {
+    const runningDeg = (deviceStatusPercentages.running / 100) * 360;
+    const maintenanceDeg = (deviceStatusPercentages.maintenance / 100) * 360;
+    const faultDeg = (deviceStatusPercentages.fault / 100) * 360;
+    const offlineDeg = (deviceStatusPercentages.offline / 100) * 360;
+
+    let gradientParts = [];
+    let currentAngle = 0;
+
+    if (runningDeg > 0) {
+      gradientParts.push(`${PIE_CHART_COLORS.success} ${currentAngle}deg ${currentAngle + runningDeg}deg`);
+      currentAngle += runningDeg;
+    }
+    if (maintenanceDeg > 0) {
+      gradientParts.push(`${PIE_CHART_COLORS.warning} ${currentAngle}deg ${currentAngle + maintenanceDeg}deg`);
+      currentAngle += maintenanceDeg;
+    }
+    if (faultDeg > 0) {
+      gradientParts.push(`${PIE_CHART_COLORS.error} ${currentAngle}deg ${currentAngle + faultDeg}deg`);
+      currentAngle += faultDeg;
+    }
+    if (offlineDeg > 0) {
+      gradientParts.push(`${PIE_CHART_COLORS.primary} ${currentAngle}deg ${currentAngle + offlineDeg}deg`);
+    }
+
+    const conicGradient = gradientParts.length > 0 ? `conic-gradient(${gradientParts.join(', ')})` : 'conic-gradient(#e5e7eb 0deg 360deg)';
+
+    return {
+      width: '180px',
+      height: '180px',
+      borderRadius: '50%',
+      background: conicGradient,
+      position: 'relative',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+    };
+  }, [deviceStatusPercentages]);
 
   const handleRefresh = useCallback(async () => {
     setAnimatedKey((prev) => prev + 1);
-    await Promise.all([
-      mutateDevices(),
-    ]);
-  }, [mutateDevices]);
+    await mutateStats();
+  }, [mutateStats]);
 
   const handleHover = useCallback((key) => {
     setHoveredCard(key);
@@ -182,6 +238,7 @@ function Dashboard() {
         title: '总设备数',
         trend: stats.deviceGrowth,
         tagColor: 'blue',
+        hideTrend: true,
         delay: 0,
       },
       {
@@ -197,7 +254,7 @@ function Dashboard() {
         title: '总机柜数',
         trend: 0,
         tagColor: 'green',
-        customStatus: true,
+        hideTrend: true,
         delay: 1,
       },
       {
@@ -213,7 +270,7 @@ function Dashboard() {
         title: '总机房数',
         trend: 0,
         tagColor: 'green',
-        customStatus: true,
+        hideTrend: true,
         delay: 2,
       },
       {
@@ -229,6 +286,7 @@ function Dashboard() {
         title: '故障设备',
         trend: stats.faultTrend,
         tagColor: 'red',
+        hideTrend: true,
         delay: 3,
       },
       {
@@ -242,8 +300,9 @@ function Dashboard() {
         color: '#13c2c2',
         statKey: 'totalUsers',
         title: '用户总数',
-        trend: 5.2,
+        trend: stats.userGrowth,
         tagColor: 'cyan',
+        hideTrend: true,
         delay: 4,
       },
       {
@@ -257,25 +316,25 @@ function Dashboard() {
         color: '#fa8c16',
         statKey: 'activeTickets',
         title: '待处理工单',
-        trend: -8.5,
+        trend: stats.ticketTrend,
         tagColor: 'orange',
+        hideTrend: true,
         delay: 5,
       },
     ],
-    [stats.deviceGrowth, stats.faultTrend]
+    [stats.deviceGrowth, stats.faultTrend, stats.userGrowth, stats.ticketTrend]
   );
 
   const deviceTrendData = useMemo(
-    () => [
-      { label: '周一', value: 45, color: designTokens.colors.primary.main },
-      { label: '周二', value: 52, color: designTokens.colors.primary.main },
-      { label: '周三', value: 48, color: designTokens.colors.primary.main },
-      { label: '周四', value: 60, color: designTokens.colors.success.main },
-      { label: '周五', value: 55, color: designTokens.colors.success.main },
-      { label: '周六', value: 42, color: designTokens.colors.warning.main },
-      { label: '周日', value: 58, color: designTokens.colors.primary.main },
-    ],
-    []
+    () => {
+      const rawData = statsData?.deviceTrendData || [];
+      return rawData.map((item) => ({
+        label: item.label,
+        value: item.value,
+        color: designTokens.colors.primary.main
+      }));
+    },
+    [statsData?.deviceTrendData]
   );
 
   const styles = `
@@ -358,7 +417,7 @@ function Dashboard() {
                       </span>
                     </div>
                   </div>
-                  <StatusLegend />
+                  <StatusLegend deviceStatusPercentages={deviceStatusPercentages} />
                 </div>
               </div>
             </Card>
@@ -403,7 +462,7 @@ function Dashboard() {
                       </div>
                     }
                   >
-                    <PowerGauge value={stats.powerUsage} maxValue={10000} />
+                    <PowerGauge value={stats.powerUsage} maxValue={stats.totalMaxPower} />
                   </ErrorBoundary>
                 </div>
               </div>
@@ -485,7 +544,7 @@ function Dashboard() {
                     </p>
                   </div>
 
-                  <QuickStats onlineRate={stats.onlineRate} powerUsage={stats.powerUsage} />
+                  <QuickStats onlineRate={stats.onlineRate} powerUsage={stats.powerUsage} totalMaxPower={stats.totalMaxPower} />
                 </Col>
 
                 <Col xs={24} md={8}>

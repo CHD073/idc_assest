@@ -204,7 +204,7 @@ function PortManagement() {
       const deviceId = port.deviceId;
       if (!grouped[deviceId]) {
         grouped[deviceId] = {
-          device: devices.find(d => d.deviceId === deviceId),
+          device: port.device || devices.find(d => d.deviceId === deviceId),
           ports: [],
         };
       }

@@ -16,7 +16,11 @@ const quickStatItemStyle = {
   boxShadow: designTokens.shadows.small,
 };
 
-const QuickStats = ({ onlineRate, powerUsage }) => {
+const QuickStats = ({ onlineRate, powerUsage, totalMaxPower }) => {
+  const powerUsagePercent = totalMaxPower > 0
+    ? ((powerUsage / totalMaxPower) * 100).toFixed(1)
+    : '0.0';
+
   const quickStats = [
     {
       icon: LineChartOutlined,
@@ -33,7 +37,7 @@ const QuickStats = ({ onlineRate, powerUsage }) => {
     {
       icon: ThunderboltOutlined,
       label: '功率使用',
-      value: `${powerUsage}W`,
+      value: `${powerUsagePercent}%`,
       color: designTokens.colors.warning.main,
     },
   ];
