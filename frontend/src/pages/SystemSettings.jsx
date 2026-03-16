@@ -277,7 +277,7 @@ const SystemSettings = () => {
         return (
           <Form.Item key={key} label={data.description || key} name={key}>
             <Select>
-              {options.map(opt => (
+              {(Array.isArray(options) ? options : []).map(opt => (
                 <Option key={opt.value} value={opt.value}>
                   {opt.label}
                 </Option>

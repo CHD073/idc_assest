@@ -1079,7 +1079,7 @@ const BackupManagement = () => {
                 style={{
                   ...buttonStyles.icon.base,
                   background: designTokens.colors.background.accent,
-                  color: designTokens.colors.danger.main,
+                  color: designTokens.colors.error.main,
                 }}
               />
             </Tooltip>
@@ -1195,7 +1195,7 @@ const BackupManagement = () => {
     },
     danger: {
       base: {
-        background: designTokens.colors.danger.gradient,
+        background: designTokens.colors.error.gradient,
         border: 'none',
         borderRadius: designTokens.borderRadius.md,
         padding: '8px 20px',

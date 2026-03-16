@@ -168,6 +168,13 @@ export const backupAPI = {
     });
   },
   info: () => api.get('/backup/info'),
+  getAutoStatus: () => api.get('/backup/auto/status'),
+  updateAutoSettings: data => api.post('/backup/auto/settings', data),
+  executeNow: data => api.post('/backup/auto/execute', data),
+  testCron: data => api.post('/backup/auto/test-cron', data),
+  getLogs: params => api.get('/backup/logs', { params }),
+  getLogDetail: id => api.get(`/backup/logs/${id}`),
+  cleanOldLogs: days => api.delete('/backup/logs/clean', { params: { days } }),
 };
 
 export default api;

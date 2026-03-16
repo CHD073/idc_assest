@@ -64,10 +64,12 @@ const ConsumableRecord = sequelize.define('ConsumableRecord', {
 
 ConsumableRecord.belongsTo(Consumable, { 
   foreignKey: 'consumableId',
+  as: 'consumable',
   onDelete: 'CASCADE'
 });
 Consumable.hasMany(ConsumableRecord, { 
   foreignKey: 'consumableId',
+  as: 'records',
   onDelete: 'CASCADE'
 });
 

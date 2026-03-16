@@ -1,6 +1,6 @@
 {
   "enabled": true,
-  "cronExpression": "0 20 * * *",
+  "cronExpression": "0 19 * * *",
   "description": "自动备份",
   "backupType": "full",
   "includeFiles": true,

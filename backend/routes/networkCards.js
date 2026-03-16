@@ -60,6 +60,68 @@ router.get('/device/:deviceId', async (req, res) => {
   }
 });
 
+router.get('/device/:deviceId/with-ports', async (req, res) => {
+  try {
+    const { deviceId } = req.params;
+
+    const networkCards = await NetworkCard.findAll({
+      where: { deviceId },
+      order: [['slotNumber', 'ASC'], ['name', 'ASC']]
+    });
+
+    const cardsWithPorts = await Promise.all(
+      networkCards.map(async (card) => {
+        const ports = await DevicePort.findAll({
+          where: { nicId: card.nicId },
+          order: [['portName', 'ASC']]
+        });
+
+        const freeCount = ports.filter(p => p.status === 'free').length;
+        const occupiedCount = ports.filter(p => p.status === 'occupied').length;
+        const faultCount = ports.filter(p => p.status === 'fault').length;
+
+        return {
+          ...card.toJSON(),
+          ports,
+          stats: {
+            total: ports.length,
+            free: freeCount,
+            occupied: occupiedCount,
+            fault: faultCount
+          }
+        };
+      })
+    );
+
+    const ungroupedPorts = await DevicePort.findAll({
+      where: { deviceId, nicId: null },
+      order: [['portName', 'ASC']]
+    });
+
+    if (ungroupedPorts.length > 0) {
+      cardsWithPorts.push({
+        nicId: '_ungrouped',
+        name: '未分组端口',
+        description: '未分配到网卡的端口',
+        portCount: ungroupedPorts.length,
+        isUngrouped: true,
+        ports: ungroupedPorts,
+        stats: {
+          total: ungroupedPorts.length,
+          free: ungroupedPorts.filter(p => p.status === 'free').length,
+          occupied: ungroupedPorts.filter(p => p.status === 'occupied').length,
+          fault: ungroupedPorts.filter(p => p.status === 'fault').length
+        }
+      });
+    }
+
+    res.json(cardsWithPorts);
+  } catch (error) {
+    console.error('获取网卡及端口失败:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 router.get('/:nicId', async (req, res) => {
   try {
     const networkCard = await NetworkCard.findByPk(req.params.nicId, {
@@ -194,68 +256,6 @@ router.delete('/:nicId', async (req, res) => {
     }
   } catch (error) {
     console.error('删除网卡失败:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-router.get('/device/:deviceId/with-ports', async (req, res) => {
-  try {
-    const { deviceId } = req.params;
-
-    const networkCards = await NetworkCard.findAll({
-      where: { deviceId },
-      order: [['slotNumber', 'ASC'], ['name', 'ASC']]
-    });
-
-    const cardsWithPorts = await Promise.all(
-      networkCards.map(async (card) => {
-        const ports = await DevicePort.findAll({
-          where: { nicId: card.nicId },
-          order: [['portName', 'ASC']]
-        });
-
-        const freeCount = ports.filter(p => p.status === 'free').length;
-        const occupiedCount = ports.filter(p => p.status === 'occupied').length;
-        const faultCount = ports.filter(p => p.status === 'fault').length;
-
-        return {
-          ...card.toJSON(),
-          ports,
-          stats: {
-            total: ports.length,
-            free: freeCount,
-            occupied: occupiedCount,
-            fault: faultCount
-          }
-        };
-      })
-    );
-
-    const ungroupedPorts = await DevicePort.findAll({
-      where: { deviceId, nicId: null },
-      order: [['portName', 'ASC']]
-    });
-
-    if (ungroupedPorts.length > 0) {
-      cardsWithPorts.push({
-        nicId: '_ungrouped',
-        name: '未分组端口',
-        description: '未分配到网卡的端口',
-        portCount: ungroupedPorts.length,
-        isUngrouped: true,
-        ports: ungroupedPorts,
-        stats: {
-          total: ungroupedPorts.length,
-          free: ungroupedPorts.filter(p => p.status === 'free').length,
-          occupied: ungroupedPorts.filter(p => p.status === 'occupied').length,
-          fault: ungroupedPorts.filter(p => p.status === 'fault').length
-        }
-      });
-    }
-
-    res.json(cardsWithPorts);
-  } catch (error) {
-    console.error('获取网卡及端口失败:', error);
     res.status(500).json({ error: error.message });
   }
 });

@@ -353,7 +353,7 @@ const InventoryTaskExecution = () => {
             size="large"
             style={inputStyle}
           >
-            {(options || [
+            {(Array.isArray(options) && options.length > 0 ? options : [
               { value: 'server', label: '服务器' },
               { value: 'switch', label: '交换机' },
               { value: 'router', label: '路由器' },
@@ -396,7 +396,7 @@ const InventoryTaskExecution = () => {
             size="large"
             style={inputStyle}
           >
-            {(options || []).map(opt => (
+            {(Array.isArray(options) ? options : []).map(opt => (
               <Select.Option key={opt.value} value={opt.value}>
                 {opt.label}
               </Select.Option>
@@ -868,7 +868,7 @@ const InventoryTaskExecution = () => {
 
   const pageContainerStyle = {
     padding: '24px',
-    background: designTokens.colors.bg,
+    background: designTokens.colors.background.secondary,
     minHeight: '100vh',
   };
 

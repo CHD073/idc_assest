@@ -120,8 +120,12 @@ const VirtualDeviceList = ({
   const toggleDeviceExpand = deviceId => {
     setExpandedDevices(prev => ({
       ...prev,
-      [deviceId]: !prev[deviceId],
+      [deviceId]: prev[deviceId] === true ? false : true,
     }));
+  };
+
+  const isDeviceExpanded = deviceId => {
+    return expandedDevices[deviceId] === true;
   };
 
   const visibleDevices = devices.slice(0, visibleCount);
@@ -172,7 +176,7 @@ const VirtualDeviceList = ({
       {visibleDevices.map(device => {
         const deviceId = device.deviceId;
         const data = groupedPorts[deviceId] || { device, ports: [] };
-        const isExpanded = expandedDevices[deviceId];
+        const isExpanded = isDeviceExpanded(deviceId);
         const portCount = data.ports?.length || 0;
         const occupiedCount = data.ports?.filter(p => p.status === 'occupied').length || 0;
 
@@ -300,15 +304,21 @@ const VirtualDeviceList = ({
                   type="text"
                   size="small"
                   icon={isExpanded ? <UpOutlined /> : <DownOutlined />}
+                  onClick={e => {
+                    e.stopPropagation();
+                    toggleDeviceExpand(deviceId);
+                  }}
                   style={{ color: '#64748b' }}
-                />
+                >
+                  {isExpanded ? '收起' : '展开'}
+                </Button>
               </Space>
             </div>
 
             {/* 面板内容 - 可折叠 */}
             {isExpanded && (
               <div style={{ padding: '16px' }}>
-                {device.type === 'switch' ? (
+                {device.type?.toLowerCase()?.includes('switch') ? (
                   // 交换机使用普通端口面板
                   <PortPanel
                     ports={data.ports || []}

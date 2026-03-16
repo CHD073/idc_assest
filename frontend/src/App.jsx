@@ -334,7 +334,7 @@ const AppLayout = ({ children }) => {
         {
           key: 'pending-devices',
           icon: <CloudUploadOutlined style={{ fontSize: '16px' }} />,
-          label: <Link to="/pending-devices">暂存设备</Link>,
+          label: <Link to="/pending-devices">盘盈设备</Link>,
         },
       ],
     },

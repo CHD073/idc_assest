@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Card,
@@ -17,6 +18,11 @@ import {
   Typography,
   Spin,
   Radio,
+  Table,
+  Select,
+  Pagination,
+  Empty,
+  Tooltip,
 } from 'antd';
 import {
   ClockCircleOutlined,
@@ -31,11 +37,294 @@ import {
   SafetyOutlined,
   CloudDownloadOutlined,
   FileProtectOutlined,
+  HistoryOutlined,
+  EyeOutlined,
+  ReloadOutlined,
+  UpOutlined,
+  DownOutlined,
 } from '@ant-design/icons';
-import api from '../api';
+import { backupAPI } from '../api';
 import { useNavigate } from 'react-router-dom';
 
 const { Title, Text, Paragraph } = Typography;
+const { Option } = Select;
+
+const TimePicker = ({ hour, minute, onChange, disabled }) => {
+  const [hourInput, setHourInput] = useState(hour.toString());
+  const [minuteInput, setMinuteInput] = useState(minute.toString());
+
+  useEffect(() => {
+    setHourInput(hour.toString());
+    setMinuteInput(minute.toString());
+  }, [hour, minute]);
+
+  const handleHourChange = (newHour) => {
+    const validHour = Math.max(0, Math.min(23, newHour));
+    onChange(validHour, minute);
+  };
+
+  const handleMinuteChange = (newMinute) => {
+    const validMinute = Math.max(0, Math.min(59, newMinute));
+    onChange(hour, validMinute);
+  };
+
+  const handleHourInputBlur = () => {
+    const value = parseInt(hourInput);
+    if (!isNaN(value)) {
+      handleHourChange(value);
+    } else {
+      setHourInput(hour.toString());
+    }
+  };
+
+  const handleMinuteInputBlur = () => {
+    const value = parseInt(minuteInput);
+    if (!isNaN(value)) {
+      handleMinuteChange(value);
+    } else {
+      setMinuteInput(minute.toString());
+    }
+  };
+
+  const handleHourKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      handleHourInputBlur();
+    }
+  };
+
+  const handleMinuteKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      handleMinuteInputBlur();
+    }
+  };
+
+  const incrementHour = () => handleHourChange(hour + 1);
+  const decrementHour = () => handleHourChange(hour - 1);
+  const incrementMinute = () => handleMinuteChange(minute + 1);
+  const decrementMinute = () => handleMinuteChange(minute - 1);
+
+  const timePeriods = [
+    { start: 0, end: 5, label: '深夜', icon: '🌙' },
+    { start: 6, end: 8, label: '清晨', icon: '🌅' },
+    { start: 9, end: 11, label: '上午', icon: '☀️' },
+    { start: 12, end: 13, label: '中午', icon: '🌞' },
+    { start: 14, end: 17, label: '下午', icon: '🌤️' },
+    { start: 18, end: 21, label: '傍晚', icon: '🌇' },
+    { start: 22, end: 23, label: '夜晚', icon: '🌙' },
+  ];
+
+  const currentPeriod = timePeriods.find(p => hour >= p.start && hour <= p.end);
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 14,
+        padding: '18px 24px',
+        background: disabled ? '#f5f5f5' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        borderRadius: '14px',
+        transition: 'all 0.3s ease',
+        minWidth: 280,
+      }}>
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 5,
+        }}>
+          <Button
+            type="text"
+            icon={<UpOutlined />}
+            onClick={incrementHour}
+            disabled={disabled}
+            style={{
+              color: disabled ? '#bfbfbf' : '#fff',
+              fontSize: 15,
+              height: 30,
+              width: 56,
+              padding: 0,
+            }}
+          />
+          <Input
+            value={hourInput}
+            onChange={(e) => setHourInput(e.target.value)}
+            onBlur={handleHourInputBlur}
+            onPressEnter={handleHourKeyPress}
+            disabled={disabled}
+            maxLength={2}
+            style={{
+              width: 66,
+              height: 48,
+              fontSize: 30,
+              fontWeight: 700,
+              textAlign: 'center',
+              color: disabled ? '#bfbfbf' : '#fff',
+              background: disabled ? 'transparent' : 'rgba(255, 255, 255, 0.18)',
+              border: 'none',
+              borderRadius: '10px',
+              fontFamily: "'SF Mono', 'Fira Code', 'Consolas', monospace",
+              outline: 'none',
+              boxShadow: 'none',
+            }}
+          />
+          <Button
+            type="text"
+            icon={<DownOutlined />}
+            onClick={decrementHour}
+            disabled={disabled}
+            style={{
+              color: disabled ? '#bfbfbf' : '#fff',
+              fontSize: 15,
+              height: 30,
+              width: 56,
+              padding: 0,
+            }}
+          />
+          <Text style={{
+            fontSize: 12,
+            color: disabled ? '#bfbfbf' : 'rgba(255, 255, 255, 0.85)',
+            marginTop: 3,
+          }}>
+            小时
+          </Text>
+        </div>
+
+        <div style={{
+          fontSize: 34,
+          fontWeight: 700,
+          color: disabled ? '#bfbfbf' : '#fff',
+          fontFamily: "'SF Mono', 'Fira Code', 'Consolas', monospace",
+          marginTop: -12,
+        }}>
+          :
+        </div>
+
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          gap: 5,
+        }}>
+          <Button
+            type="text"
+            icon={<UpOutlined />}
+            onClick={incrementMinute}
+            disabled={disabled}
+            style={{
+              color: disabled ? '#bfbfbf' : '#fff',
+              fontSize: 15,
+              height: 30,
+              width: 56,
+              padding: 0,
+            }}
+          />
+          <Input
+            value={minuteInput}
+            onChange={(e) => setMinuteInput(e.target.value)}
+            onBlur={handleMinuteInputBlur}
+            onPressEnter={handleMinuteKeyPress}
+            disabled={disabled}
+            maxLength={2}
+            style={{
+              width: 66,
+              height: 48,
+              fontSize: 30,
+              fontWeight: 700,
+              textAlign: 'center',
+              color: disabled ? '#bfbfbf' : '#fff',
+              background: disabled ? 'transparent' : 'rgba(255, 255, 255, 0.18)',
+              border: 'none',
+              borderRadius: '10px',
+              fontFamily: "'SF Mono', 'Fira Code', 'Consolas', monospace",
+              outline: 'none',
+              boxShadow: 'none',
+            }}
+          />
+          <Button
+            type="text"
+            icon={<DownOutlined />}
+            onClick={decrementMinute}
+            disabled={disabled}
+            style={{
+              color: disabled ? '#bfbfbf' : '#fff',
+              fontSize: 15,
+              height: 30,
+              width: 56,
+              padding: 0,
+            }}
+          />
+          <Text style={{
+            fontSize: 12,
+            color: disabled ? '#bfbfbf' : 'rgba(255, 255, 255, 0.85)',
+            marginTop: 3,
+          }}>
+            分钟
+          </Text>
+        </div>
+      </div>
+
+      {currentPeriod && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 8,
+          padding: '10px 20px',
+          background: disabled ? '#f5f5f5' : '#eff6ff',
+          borderRadius: '12px',
+          border: disabled ? '1px solid #f0f0f0' : '1px solid #dbeafe',
+        }}>
+          <span style={{ fontSize: 22 }}>{currentPeriod.icon}</span>
+          <Text style={{
+            fontSize: 14,
+            color: disabled ? '#bfbfbf' : '#3b82f6',
+            fontWeight: 500,
+          }}>
+            {currentPeriod.label}
+          </Text>
+        </div>
+      )}
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
+        {[
+            { hour: 2, minute: 0, label: '凌晨 2:00', recommended: true },
+            { hour: 3, minute: 0, label: '凌晨 3:00' },
+            { hour: 4, minute: 0, label: '凌晨 4:00', recommended: true },
+            { hour: 20, minute: 0, label: '晚上 8:00' },
+            { hour: 22, minute: 0, label: '晚上 10:00' },
+        ].map((preset, index) => (
+          <Button
+            key={index}
+            size="small"
+            onClick={() => !disabled && onChange(preset.hour, preset.minute)}
+            disabled={disabled}
+            style={{
+              borderRadius: '8px',
+              border: hour === preset.hour && minute === preset.minute 
+                ? '1px solid #667eea' 
+                : disabled ? '1px solid #f0f0f0' : '1px solid #e5e7eb',
+              background: hour === preset.hour && minute === preset.minute 
+                ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' 
+                : '#fff',
+              color: hour === preset.hour && minute === preset.minute 
+                ? '#fff' 
+                : disabled ? '#bfbfbf' : '#374151',
+              fontWeight: preset.recommended ? 600 : 400,
+              fontSize: 13,
+              height: 32,
+              padding: '0 12px',
+            }}
+          >
+            {preset.label}
+            {preset.recommended && <span style={{ marginLeft: 4, fontSize: 11 }}>⭐</span>}
+          </Button>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 const AutoBackupSettings = () => {
   const navigate = useNavigate();
@@ -49,14 +338,30 @@ const AutoBackupSettings = () => {
     compress: true,
     maxCount: 30,
     maxAgeDays: 90,
+    backupType: 'full',
   });
   const [modified, setModified] = useState(false);
   const isInitialMount = useRef(true);
   const isFetching = useRef(false);
+  
+  const [logs, setLogs] = useState([]);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [logsPagination, setLogsPagination] = useState({
+    current: 1,
+    pageSize: 10,
+    total: 0,
+  });
+  const [logFilter, setLogFilter] = useState({
+    logType: '',
+    status: '',
+  });
+  const [logDetailModal, setLogDetailModal] = useState(false);
+  const [selectedLog, setSelectedLog] = useState(null);
 
   useEffect(() => {
     if (isInitialMount.current) {
       fetchStatus();
+      fetchLogs();
       isInitialMount.current = false;
     }
   }, []);
@@ -67,12 +372,11 @@ const AutoBackupSettings = () => {
     try {
       setLoading(true);
       isFetching.current = true;
-      const response = await api.get('/backup/auto/status');
+      const response = await backupAPI.getAutoStatus();
       if (response?.success) {
         const data = response.data;
         setStatus(data);
         
-        // 解析 Cron 表达式获取小时和分钟
         if (data.cronExpression) {
           const parts = data.cronExpression.split(' ');
           const minute = parseInt(parts[0]);
@@ -87,6 +391,7 @@ const AutoBackupSettings = () => {
             compress: data.compress !== undefined ? data.compress : true,
             maxCount: data.maxCount || 30,
             maxAgeDays: data.maxAgeDays || 90,
+            backupType: data.backupType || 'full',
           }));
         }
       }
@@ -98,10 +403,34 @@ const AutoBackupSettings = () => {
     }
   }, []);
 
+  const fetchLogs = useCallback(async (page = 1, pageSize = 10) => {
+    try {
+      setLogsLoading(true);
+      const params = { page, pageSize };
+      if (logFilter.logType) params.logType = logFilter.logType;
+      if (logFilter.status) params.status = logFilter.status;
+      
+      const response = await backupAPI.getLogs(params);
+      if (response?.success) {
+        setLogs(response.data.logs || []);
+        setLogsPagination({
+          current: response.data.page || 1,
+          pageSize: response.data.pageSize || 10,
+          total: response.data.total || 0,
+        });
+      }
+    } catch (error) {
+      console.error('获取备份日志失败:', error);
+      message.error('获取备份日志失败');
+    } finally {
+      setLogsLoading(false);
+    }
+  }, [logFilter]);
+
   const handleSave = async () => {
     try {
       setLoading(true);
-      const response = await api.post('/backup/auto/settings', {
+      const response = await backupAPI.updateAutoSettings({
         enabled: settings.enabled,
         hour: settings.hour,
         minute: settings.minute,
@@ -109,12 +438,13 @@ const AutoBackupSettings = () => {
         compress: settings.compress,
         maxCount: settings.maxCount,
         maxAgeDays: settings.maxAgeDays,
+        backupType: settings.backupType,
       });
 
       if (response?.success) {
         message.success('自动备份设置已保存');
         setModified(false);
-        // 不需要立即刷新，因为保存成功后状态已经是最新的
+        fetchStatus();
       }
     } catch (error) {
       message.error('保存失败：' + (error.response?.data?.message || error.message));
@@ -147,14 +477,16 @@ const AutoBackupSettings = () => {
       onOk: async () => {
         try {
           setLoading(true);
-          const response = await api.post('/backup/auto/execute', {
+          const response = await backupAPI.executeNow({
             description: `手动触发 - ${new Date().toLocaleString('zh-CN')}`,
             includeFiles: settings.includeFiles,
             compress: settings.compress,
+            backupType: settings.backupType,
           });
 
           if (response?.success) {
             message.success('备份执行成功！');
+            fetchLogs(logsPagination.current, logsPagination.pageSize);
           }
         } catch (error) {
           message.error('执行失败：' + (error.response?.data?.message || error.message));
@@ -180,6 +512,34 @@ const AutoBackupSettings = () => {
     });
   };
 
+  const formatDateTime = (dateTime) => {
+    if (!dateTime) return '-';
+    return new Date(dateTime).toLocaleString('zh-CN');
+  };
+
+  const formatDuration = (ms) => {
+    if (!ms) return '-';
+    const seconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    if (minutes > 0) {
+      return `${minutes}分${remainingSeconds}秒`;
+    }
+    return `${remainingSeconds}秒`;
+  };
+
+  const formatFileSize = (bytes) => {
+    if (!bytes) return '-';
+    const units = ['B', 'KB', 'MB', 'GB'];
+    let size = bytes;
+    let unitIndex = 0;
+    while (size >= 1024 && unitIndex < units.length - 1) {
+      size /= 1024;
+      unitIndex++;
+    }
+    return `${size.toFixed(2)} ${units[unitIndex]}`;
+  };
+
   const getStatusColor = () => {
     if (!status) return 'default';
     if (status.enabled && status.isActive) return 'success';
@@ -194,7 +554,43 @@ const AutoBackupSettings = () => {
     return '自动备份已禁用';
   };
 
-  // 状态卡片组件
+  const getLogStatusTag = (status) => {
+    const statusMap = {
+      pending: { color: 'default', text: '待执行' },
+      running: { color: 'processing', text: '执行中' },
+      success: { color: 'success', text: '成功' },
+      failed: { color: 'error', text: '失败' },
+    };
+    const info = statusMap[status] || { color: 'default', text: status };
+    return <Tag color={info.color}>{info.text}</Tag>;
+  };
+
+  const getLogTypeTag = (type) => {
+    const typeMap = {
+      auto: { color: 'blue', text: '自动备份' },
+      manual: { color: 'green', text: '手动备份' },
+    };
+    const info = typeMap[type] || { color: 'default', text: type };
+    return <Tag color={info.color}>{info.text}</Tag>;
+  };
+
+  const handleLogPageChange = (page, pageSize) => {
+    fetchLogs(page, pageSize);
+  };
+
+  const handleLogFilterChange = (key, value) => {
+    setLogFilter(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleViewLogDetail = (log) => {
+    setSelectedLog(log);
+    setLogDetailModal(true);
+  };
+
+  const handleRefreshLogs = () => {
+    fetchLogs(logsPagination.current, logsPagination.pageSize);
+  };
+
   const StatusCard = ({ icon, title, value, subtitle, gradient }) => (
     <div style={{
       padding: '20px',
@@ -219,27 +615,97 @@ const AutoBackupSettings = () => {
     </div>
   );
 
-  // 设置项组件
   const SettingItem = ({ title, description, children, bordered = true }) => (
     <div style={{
-      padding: '16px 0',
-      borderBottom: bordered ? '1px solid #f0f0f0' : 'none',
+      padding: '20px 0',
+      borderBottom: bordered ? '1px solid #f5f5f5' : 'none',
     }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16 }}>
-        <div style={{ flex: 1 }}>
-          <div style={{ fontWeight: 500, fontSize: 14, color: '#1f2937', marginBottom: 4 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 24 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 600, fontSize: 15, color: '#1f2937', marginBottom: 6 }}>
             {title}
           </div>
           {description && (
-            <Paragraph style={{ margin: 0, fontSize: 12, color: '#6b7280', lineHeight: 1.5 }}>
+            <Paragraph style={{ 
+              margin: 0, 
+              fontSize: 13, 
+              color: '#6b7280', 
+              lineHeight: 1.6,
+              maxWidth: 400,
+            }}>
               {description}
             </Paragraph>
           )}
         </div>
-        <div style={{ flexShrink: 0 }}>{children}</div>
+        <div style={{ 
+          flexShrink: 0, 
+          display: 'flex', 
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+        }}>
+          {children}
+        </div>
       </div>
     </div>
   );
+
+  const logColumns = [
+    {
+      title: '类型',
+      dataIndex: 'logType',
+      key: 'logType',
+      width: 120,
+      render: (type) => getLogTypeTag(type),
+    },
+    {
+      title: '状态',
+      dataIndex: 'status',
+      key: 'status',
+      width: 100,
+      render: (status) => getLogStatusTag(status),
+    },
+    {
+      title: '描述',
+      dataIndex: 'description',
+      key: 'description',
+      ellipsis: true,
+    },
+    {
+      title: '文件大小',
+      dataIndex: 'fileSize',
+      key: 'fileSize',
+      width: 120,
+      render: (size) => formatFileSize(size),
+    },
+    {
+      title: '执行时间',
+      dataIndex: 'duration',
+      key: 'duration',
+      width: 120,
+      render: (duration) => formatDuration(duration),
+    },
+    {
+      title: '创建时间',
+      dataIndex: 'createdAt',
+      key: 'createdAt',
+      width: 180,
+      render: (date) => formatDateTime(date),
+    },
+    {
+      title: '操作',
+      key: 'actions',
+      width: 100,
+      render: (_, record) => (
+        <Tooltip title="查看详情">
+          <Button
+            type="text"
+            icon={<EyeOutlined />}
+            onClick={() => handleViewLogDetail(record)}
+          />
+        </Tooltip>
+      ),
+    },
+  ];
 
   if (loading && !status) {
     return (
@@ -262,7 +728,6 @@ const AutoBackupSettings = () => {
       padding: '24px',
     }}>
       <div style={{ maxWidth: 1400, margin: '0 auto' }}>
-        {/* 页面头部 */}
         <div style={{ marginBottom: 32 }}>
           <Button
             icon={<ArrowLeftOutlined />}
@@ -334,7 +799,6 @@ const AutoBackupSettings = () => {
           </div>
         </div>
 
-        {/* 状态概览 */}
         <div style={{ marginBottom: 32 }}>
           <Title level={4} style={{ margin: '0 0 16px 0', color: '#1f2937', fontWeight: 600 }}>
             <ThunderboltOutlined style={{ marginRight: 8 }} />
@@ -378,9 +842,7 @@ const AutoBackupSettings = () => {
           </Row>
         </div>
 
-        {/* 设置卡片 */}
         <Row gutter={[24, 24]}>
-          {/* 基本设置 */}
           <Col xs={24} lg={12}>
             <Card 
               title={
@@ -425,37 +887,23 @@ const AutoBackupSettings = () => {
                 title="备份时间"
                 description="每天自动执行备份的时间，建议设置在业务低峰期"
               >
-                <Space>
-                  <InputNumber
-                    min={0}
-                    max={23}
-                    value={settings.hour}
-                    onChange={(value) => {
-                      setSettings({ ...settings, hour: value });
-                      setModified(true);
-                    }}
-                    addonAfter="时"
-                    disabled={!settings.enabled}
-                    style={{ width: 100 }}
-                  />
-                  <InputNumber
-                    min={0}
-                    max={59}
-                    value={settings.minute}
-                    onChange={(value) => {
-                      setSettings({ ...settings, minute: value });
-                      setModified(true);
-                    }}
-                    addonAfter="分"
-                    disabled={!settings.enabled}
-                    style={{ width: 100 }}
-                  />
-                </Space>
+                <TimePicker
+                  hour={settings.hour}
+                  minute={settings.minute}
+                  onChange={(newHour, newMinute) => {
+                    setSettings(prev => ({
+                      ...prev,
+                      hour: newHour,
+                      minute: newMinute,
+                    }));
+                    setModified(true);
+                  }}
+                  disabled={!settings.enabled}
+                />
               </SettingItem>
             </Card>
           </Col>
 
-          {/* 高级设置 */}
           <Col xs={24} lg={12}>
             <Card 
               title={
@@ -480,6 +928,23 @@ const AutoBackupSettings = () => {
                 height: '100%',
               }}
             >
+              <SettingItem
+                title="备份类型"
+                description="选择全量备份或增量备份。全量备份每次备份完整数据；增量备份仅备份变化数据，节省空间"
+              >
+                <Radio.Group
+                  value={settings.backupType}
+                  onChange={(e) => {
+                    setSettings({ ...settings, backupType: e.target.value });
+                    setModified(true);
+                  }}
+                  disabled={!settings.enabled}
+                >
+                  <Radio value="full">全量备份</Radio>
+                  <Radio value="incremental">增量备份</Radio>
+                </Radio.Group>
+              </SettingItem>
+
               <SettingItem
                 title="包含文件"
                 description="备份时包含上传的文件（如用户头像等）"
@@ -552,7 +1017,101 @@ const AutoBackupSettings = () => {
           </Col>
         </Row>
 
-        {/* 提示信息 */}
+        <Card 
+          title={
+            <Space>
+              <div style={{
+                width: 36,
+                height: 36,
+                borderRadius: '10px',
+                background: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+                <HistoryOutlined style={{ color: '#fff', fontSize: 18 }} />
+              </div>
+              <span style={{ fontSize: 16, fontWeight: 600 }}>备份日志</span>
+            </Space>
+          }
+          style={{ 
+            borderRadius: '20px', 
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.05)',
+            marginTop: 24,
+          }}
+          extra={
+            <Button 
+              icon={<ReloadOutlined />} 
+              onClick={handleRefreshLogs}
+              loading={logsLoading}
+            >
+              刷新
+            </Button>
+          }
+        >
+          <div style={{ marginBottom: 16 }}>
+            <Space>
+              <Text>类型：</Text>
+              <Select
+                placeholder="全部类型"
+                style={{ width: 150 }}
+                allowClear
+                value={logFilter.logType || undefined}
+                onChange={(value) => handleLogFilterChange('logType', value)}
+              >
+                <Option value="auto">自动备份</Option>
+                <Option value="manual">手动备份</Option>
+              </Select>
+              <Text>状态：</Text>
+              <Select
+                placeholder="全部状态"
+                style={{ width: 150 }}
+                allowClear
+                value={logFilter.status || undefined}
+                onChange={(value) => handleLogFilterChange('status', value)}
+              >
+                <Option value="pending">待执行</Option>
+                <Option value="running">执行中</Option>
+                <Option value="success">成功</Option>
+                <Option value="failed">失败</Option>
+              </Select>
+              <Button 
+                type="primary" 
+                onClick={() => fetchLogs(1, logsPagination.pageSize)}
+              >
+                筛选
+              </Button>
+            </Space>
+          </div>
+
+          <Table
+            columns={logColumns}
+            dataSource={logs}
+            rowKey="id"
+            loading={logsLoading}
+            pagination={false}
+            locale={{
+              emptyText: (
+                <Empty
+                  image={Empty.PRESENTED_IMAGE_SIMPLE}
+                  description="暂无备份日志"
+                />
+              ),
+            }}
+          />
+
+          <div style={{ marginTop: 16, textAlign: 'right' }}>
+            <Pagination
+              current={logsPagination.current}
+              pageSize={logsPagination.pageSize}
+              total={logsPagination.total}
+              onChange={handleLogPageChange}
+              showSizeChanger
+              showTotal={(total) => `共 ${total} 条`}
+            />
+          </div>
+        </Card>
+
         <div style={{ marginTop: 24 }}>
           <Alert
             message={
@@ -601,7 +1160,6 @@ const AutoBackupSettings = () => {
           />
         </div>
 
-        {/* 安全提示 */}
         <div style={{ marginTop: 24 }}>
           <Alert
             message={
@@ -621,8 +1179,83 @@ const AutoBackupSettings = () => {
           />
         </div>
       </div>
+
+      <Modal
+        title="备份日志详情"
+        open={logDetailModal}
+        onCancel={() => setLogDetailModal(false)}
+        footer={[
+          <Button key="close" onClick={() => setLogDetailModal(false)}>
+            关闭
+          </Button>
+        ]}
+        width={700}
+      >
+        {selectedLog && (
+          <Descriptions column={1} bordered>
+            <Descriptions.Item label="类型">
+              {getLogTypeTag(selectedLog.logType)}
+            </Descriptions.Item>
+            <Descriptions.Item label="状态">
+              {getLogStatusTag(selectedLog.status)}
+            </Descriptions.Item>
+            <Descriptions.Item label="描述">
+              {selectedLog.description || '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="备份类型">
+              {selectedLog.backupType === 'full' ? '全量备份' : '增量备份'}
+            </Descriptions.Item>
+            <Descriptions.Item label="文件名">
+              {selectedLog.filename || '-'}
+            </Descriptions.Item>
+            <Descriptions.Item label="文件大小">
+              {formatFileSize(selectedLog.fileSize)}
+            </Descriptions.Item>
+            <Descriptions.Item label="包含文件">
+              {selectedLog.includeFiles ? '是' : '否'}
+            </Descriptions.Item>
+            <Descriptions.Item label="压缩">
+              {selectedLog.compressed ? '是' : '否'}
+            </Descriptions.Item>
+            <Descriptions.Item label="开始时间">
+              {formatDateTime(selectedLog.startTime)}
+            </Descriptions.Item>
+            <Descriptions.Item label="结束时间">
+              {formatDateTime(selectedLog.endTime)}
+            </Descriptions.Item>
+            <Descriptions.Item label="执行时长">
+              {formatDuration(selectedLog.duration)}
+            </Descriptions.Item>
+            <Descriptions.Item label="创建时间">
+              {formatDateTime(selectedLog.createdAt)}
+            </Descriptions.Item>
+            {selectedLog.errorMessage && (
+              <Descriptions.Item label="错误信息">
+                <Text type="danger">{selectedLog.errorMessage}</Text>
+              </Descriptions.Item>
+            )}
+            {selectedLog.remoteUploads && selectedLog.remoteUploads.length > 0 && (
+              <Descriptions.Item label="远端上传">
+                <div>
+                  {selectedLog.remoteUploads.map((upload, index) => (
+                    <div key={index} style={{ marginBottom: 8 }}>
+                      <Tag color={upload.success ? 'success' : 'error'}>
+                        {upload.targetName}
+                      </Tag>
+                      <Text style={{ marginLeft: 8 }}>
+                        {upload.success ? '上传成功' : `失败: ${upload.error}`}
+                      </Text>
+                    </div>
+                  ))}
+                </div>
+              </Descriptions.Item>
+            )}
+          </Descriptions>
+        )}
+      </Modal>
     </div>
   );
 };
 
 export default AutoBackupSettings;
+

@@ -78,6 +78,12 @@ async function syncInventoryModels() {
   console.log('盘点模型同步完成');
 }
 
+async function syncBackupLogModel() {
+  const BackupLog = require('./models/BackupLog');
+  await BackupLog.sync();
+  console.log('备份日志模型同步完成');
+}
+
 async function initDefaultSystemSettings() {
   console.log('开始初始化系统设置默认值...');
   const { initDefaultSettings } = require('./routes/systemSettings');
@@ -137,6 +143,7 @@ async function initializeApp() {
     await syncSystemSettings();
     await syncConsumableModels();
     await syncInventoryModels();
+    await syncBackupLogModel();
     await initDefaultSystemSettings();
     await initFaultCategories();
     await initAutoBackupScheduler();

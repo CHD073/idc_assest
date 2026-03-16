@@ -1,9 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
-  Card,
   Row,
   Col,
-  Statistic,
   Table,
   Tag,
   Progress,
@@ -13,10 +11,13 @@ import {
   Empty,
   Tooltip,
   Badge,
-  Divider,
   Typography,
   Space,
   Avatar,
+  Spin,
+  Dropdown,
+  Menu,
+  Statistic,
 } from 'antd';
 import {
   PieChartOutlined,
@@ -32,16 +33,24 @@ import {
   ExclamationCircleOutlined,
   ShoppingCartOutlined,
   DatabaseOutlined,
+  ExportOutlined,
+  FallOutlined,
+  RiseOutlined,
+  MinusOutlined,
+  ThunderboltOutlined,
+  FileExcelOutlined,
+  MoreOutlined,
+  EyeOutlined,
 } from '@ant-design/icons';
 import { motion, AnimatePresence } from 'framer-motion';
 import styled from 'styled-components';
 import dayjs from 'dayjs';
 import api from '../api';
+import { consumableRecordAPI, consumableCategoryAPI, consumableAPI } from '../api/cache';
 import { message } from 'antd';
 import {
   selectStyles,
   datePickerStyles,
-  inputPlaceholders,
 } from '../styles/deviceManagementStyles';
 import { designTokens } from '../config/theme';
 
@@ -49,44 +58,23 @@ const { Title, Text } = Typography;
 const { RangePicker } = DatePicker;
 const { Option } = Select;
 
-// 动画配置
 const containerVariants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: {
-      staggerChildren: 0.08,
-      delayChildren: 0.1,
-    },
+    transition: { staggerChildren: 0.06, delayChildren: 0.1 },
   },
 };
 
 const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
+  hidden: { opacity: 0, y: 16 },
   visible: {
     opacity: 1,
     y: 0,
-    transition: {
-      type: 'spring',
-      stiffness: 100,
-      damping: 15,
-    },
+    transition: { type: 'spring', stiffness: 120, damping: 18 },
   },
 };
 
-const cardHoverVariants = {
-  rest: { scale: 1 },
-  hover: {
-    scale: 1.02,
-    transition: {
-      type: 'spring',
-      stiffness: 400,
-      damping: 25,
-    },
-  },
-};
-
-// 样式组件
 const PageContainer = styled.div`
   padding: 24px;
   background: ${designTokens.colors.background.main};
@@ -112,17 +100,17 @@ const TitleSection = styled.div`
   gap: 16px;
 
   .icon-wrapper {
-    width: 56px;
-    height: 56px;
+    width: 52px;
+    height: 52px;
     background: ${designTokens.colors.primary.gradient};
-    border-radius: ${designTokens.borderRadius.large};
+    border-radius: 16px;
     display: flex;
     align-items: center;
     justify-content: center;
-    box-shadow: ${designTokens.shadows.glow};
+    box-shadow: 0 8px 24px rgba(99, 102, 241, 0.25);
 
     .anticon {
-      font-size: 28px;
+      font-size: 26px;
       color: white;
     }
   }
@@ -130,45 +118,103 @@ const TitleSection = styled.div`
   .title-content {
     h1 {
       margin: 0;
-      font-size: 28px;
+      font-size: 26px;
       font-weight: 700;
-      background: ${designTokens.colors.primary.gradient};
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
+      color: ${designTokens.colors.text.primary};
     }
 
     .subtitle {
       color: ${designTokens.colors.text.secondary};
       font-size: 14px;
-      margin-top: 4px;
+      margin-top: 2px;
     }
   }
 `;
 
-const FilterSection = styled(motion.div)`
+const QuickFilterBar = styled(motion.div)`
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+`;
+
+const QuickFilterBtn = styled(Button)`
+  border-radius: 20px;
+  height: 32px;
+  padding: 0 16px;
+  font-size: 13px;
+  font-weight: 500;
+  border: 1px solid ${props => props.$active ? designTokens.colors.primary.main : designTokens.colors.border};
+  background: ${props => props.$active ? designTokens.colors.primary.main : 'transparent'};
+  color: ${props => props.$active ? 'white' : designTokens.colors.text.secondary};
+  
+  &:hover {
+    border-color: ${designTokens.colors.primary.main};
+    color: ${props => props.$active ? 'white' : designTokens.colors.primary.main};
+    background: ${props => props.$active ? designTokens.colors.primary.main : 'rgba(99, 102, 241, 0.05)'};
+  }
+`;
+
+const FilterCard = styled(motion.div)`
   background: ${designTokens.colors.background.card};
   padding: 20px 24px;
-  border-radius: ${designTokens.borderRadius.large};
-  box-shadow: ${designTokens.shadows.small};
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   margin-bottom: 24px;
   border: 1px solid ${designTokens.colors.border};
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+
+  @media (max-width: 768px) {
+    padding: 16px;
+  }
+`;
+
+const FilterItem = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  .filter-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: ${designTokens.colors.text.secondary};
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+`;
+
+const StatsGrid = styled(motion.div)`
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+  margin-bottom: 24px;
+
+  @media (max-width: 1200px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  @media (max-width: 576px) {
+    grid-template-columns: 1fr;
+  }
 `;
 
 const StatsCard = styled(motion.div)`
   background: ${designTokens.colors.background.card};
-  border-radius: ${designTokens.borderRadius.large};
+  border-radius: 16px;
   padding: 24px;
-  box-shadow: ${designTokens.shadows.small};
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   border: 1px solid ${designTokens.colors.border};
-  transition: all 0.3s ease;
-  height: 100%;
   position: relative;
   overflow: hidden;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 
   &:hover {
-    box-shadow: ${designTokens.shadows.large};
-    transform: translateY(-2px);
+    transform: translateY(-4px);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08);
   }
 
   &::before {
@@ -177,63 +223,92 @@ const StatsCard = styled(motion.div)`
     top: 0;
     left: 0;
     right: 0;
-    height: 4px;
-    background: ${props => props.accent || designTokens.colors.primary.gradient};
+    height: 3px;
+    background: ${props => props.$accent || designTokens.colors.primary.gradient};
   }
 
-  .card-header {
+  .card-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
     display: flex;
     align-items: center;
-    gap: 12px;
+    justify-content: center;
+    font-size: 22px;
     margin-bottom: 16px;
-
-    .icon-box {
-      width: 48px;
-      height: 48px;
-      border-radius: ${designTokens.borderRadius.medium};
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 24px;
-      background: ${props => props.iconBg || 'rgba(99, 102, 241, 0.1)'};
-      color: ${props => props.iconColor || designTokens.colors.primary.main};
-    }
-
-    .card-title {
-      font-size: 16px;
-      font-weight: 600;
-      color: ${designTokens.colors.text.primary};
-    }
+    background: ${props => props.$iconBg || 'rgba(99, 102, 241, 0.1)'};
+    color: ${props => props.$iconColor || designTokens.colors.primary.main};
   }
 
-  .stat-value {
-    font-size: 32px;
+  .card-value {
+    font-size: 36px;
     font-weight: 700;
     color: ${designTokens.colors.text.primary};
-    margin-bottom: 8px;
-    background: ${props => props.valueGradient || 'none'};
-    -webkit-background-clip: ${props => props.valueGradient ? 'text' : 'unset'};
-    -webkit-text-fill-color: ${props => props.valueGradient ? 'transparent' : 'inherit'};
-    background-clip: ${props => props.valueGradient ? 'text' : 'unset'};
+    line-height: 1.2;
+    margin-bottom: 4px;
   }
 
-  .stat-label {
-    font-size: 13px;
+  .card-label {
+    font-size: 14px;
     color: ${designTokens.colors.text.secondary};
+  }
+
+  .card-trend {
+    position: absolute;
+    top: 24px;
+    right: 24px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 20px;
+    
+    &.up {
+      color: ${designTokens.colors.success.main};
+      background: rgba(16, 185, 129, 0.1);
+    }
+    
+    &.down {
+      color: ${designTokens.colors.error.main};
+      background: rgba(239, 68, 68, 0.1);
+    }
+    
+    &.neutral {
+      color: ${designTokens.colors.text.secondary};
+      background: rgba(107, 114, 128, 0.1);
+    }
   }
 `;
 
-const ContentCard = styled(motion.div)`
+const BentoGrid = styled(motion.div)`
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  grid-template-rows: auto;
+  gap: 20px;
+  margin-bottom: 24px;
+
+  @media (max-width: 1200px) {
+    grid-template-columns: repeat(6, 1fr);
+  }
+
+  @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+  }
+`;
+
+const BentoCard = styled(motion.div)`
   background: ${designTokens.colors.background.card};
-  border-radius: ${designTokens.borderRadius.large};
-  box-shadow: ${designTokens.shadows.small};
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
   border: 1px solid ${designTokens.colors.border};
   overflow: hidden;
-  height: 100%;
+  grid-column: ${props => props.$col || 'span 6'};
   transition: all 0.3s ease;
 
   &:hover {
-    box-shadow: ${designTokens.shadows.medium};
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
   }
 
   .card-header {
@@ -242,7 +317,7 @@ const ContentCard = styled(motion.div)`
     display: flex;
     align-items: center;
     justify-content: space-between;
-    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    background: linear-gradient(135deg, #fafbfc 0%, #f5f7fa 100%);
 
     .header-left {
       display: flex;
@@ -250,19 +325,19 @@ const ContentCard = styled(motion.div)`
       gap: 12px;
 
       .header-icon {
-        width: 40px;
-        height: 40px;
-        border-radius: ${designTokens.borderRadius.medium};
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
         display: flex;
         align-items: center;
         justify-content: center;
-        font-size: 20px;
-        background: ${props => props.iconBg || designTokens.colors.primary.gradient};
+        font-size: 18px;
+        background: ${props => props.$iconBg || designTokens.colors.primary.gradient};
         color: white;
       }
 
       .header-title {
-        font-size: 17px;
+        font-size: 16px;
         font-weight: 600;
         color: ${designTokens.colors.text.primary};
       }
@@ -275,7 +350,116 @@ const ContentCard = styled(motion.div)`
   }
 
   .card-body {
-    padding: 24px;
+    padding: 20px 24px;
+  }
+`;
+
+const InOutComparison = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+
+  @media (max-width: 576px) {
+    grid-template-columns: 1fr;
+  }
+`;
+
+const ComparisonItem = styled.div`
+  padding: 20px;
+  border-radius: 12px;
+  background: ${props => props.$bg || 'transparent'};
+  text-align: center;
+
+  .item-icon {
+    font-size: 28px;
+    margin-bottom: 12px;
+    color: ${props => props.$color};
+  }
+
+  .item-value {
+    font-size: 32px;
+    font-weight: 700;
+    color: ${props => props.$color};
+    margin-bottom: 4px;
+  }
+
+  .item-label {
+    font-size: 14px;
+    color: ${designTokens.colors.text.secondary};
+    margin-bottom: 8px;
+  }
+
+  .item-sub {
+    font-size: 13px;
+    color: ${designTokens.colors.text.secondary};
+    
+    strong {
+      color: ${props => props.$color};
+    }
+  }
+`;
+
+const CategoryGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 16px;
+`;
+
+const CategoryCard = styled(motion.div)`
+  padding: 20px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #fafbfc 0%, #f5f7fa 100%);
+  border: 1px solid ${designTokens.colors.border};
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
+    border-color: ${props => props.$color}40;
+  }
+
+  .category-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 500;
+    margin-bottom: 12px;
+    background: ${props => props.$color}15;
+    color: ${props => props.$color};
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+  }
+
+  .category-count {
+    font-size: 28px;
+    font-weight: 700;
+    color: ${designTokens.colors.text.primary};
+    margin-bottom: 4px;
+  }
+
+  .category-label {
+    font-size: 13px;
+    color: ${designTokens.colors.text.secondary};
+    margin-bottom: 12px;
+  }
+
+  .category-stock {
+    font-size: 13px;
+    color: ${designTokens.colors.text.secondary};
+    
+    strong {
+      color: ${designTokens.colors.text.primary};
+    }
   }
 `;
 
@@ -285,24 +469,21 @@ const StyledTable = styled(Table)`
   }
 
   .ant-table-thead > tr > th {
-    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    background: linear-gradient(135deg, #fafbfc 0%, #f5f7fa 100%);
     font-weight: 600;
-    color: ${designTokens.colors.text.primary};
-    border-bottom: 2px solid ${designTokens.colors.border};
-    padding: 16px;
+    font-size: 13px;
+    color: ${designTokens.colors.text.secondary};
+    border-bottom: 1px solid ${designTokens.colors.border};
+    padding: 14px 16px;
   }
 
   .ant-table-tbody > tr > td {
-    padding: 16px;
-    border-bottom: 1px solid ${designTokens.colors.border};
+    padding: 14px 16px;
+    border-bottom: 1px solid ${designTokens.colors.border}40;
   }
 
   .ant-table-tbody > tr:hover > td {
-    background: rgba(99, 102, 241, 0.04);
-  }
-
-  .ant-table-row {
-    transition: all 0.2s ease;
+    background: rgba(99, 102, 241, 0.02);
   }
 `;
 
@@ -310,7 +491,7 @@ const ProgressBar = styled.div`
   .progress-wrapper {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
 
     .ant-progress {
       flex: 1;
@@ -320,59 +501,9 @@ const ProgressBar = styled.div`
     .progress-text {
       font-size: 13px;
       font-weight: 600;
-      color: ${props => props.color || designTokens.colors.text.primary};
-      min-width: 45px;
+      min-width: 42px;
       text-align: right;
     }
-  }
-`;
-
-const CategoryTag = styled(Tag)`
-  padding: 6px 14px;
-  border-radius: ${designTokens.borderRadius.full};
-  font-size: 13px;
-  font-weight: 500;
-  border: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-
-  .dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: currentColor;
-  }
-`;
-
-const StatItem = styled.div`
-  text-align: center;
-  padding: 16px;
-  background: ${props => props.bg || 'transparent'};
-  border-radius: ${designTokens.borderRadius.medium};
-  transition: all 0.3s ease;
-
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: ${designTokens.shadows.small};
-  }
-
-  .stat-icon {
-    font-size: 24px;
-    margin-bottom: 8px;
-    color: ${props => props.iconColor || designTokens.colors.primary.main};
-  }
-
-  .stat-number {
-    font-size: 24px;
-    font-weight: 700;
-    color: ${designTokens.colors.text.primary};
-    margin-bottom: 4px;
-  }
-
-  .stat-label {
-    font-size: 12px;
-    color: ${designTokens.colors.text.secondary};
   }
 `;
 
@@ -382,20 +513,35 @@ const EmptyState = styled.div`
   color: ${designTokens.colors.text.secondary};
 
   .empty-icon {
-    font-size: 64px;
+    font-size: 56px;
     margin-bottom: 16px;
-    opacity: 0.5;
+    opacity: 0.4;
   }
 
   .empty-text {
-    font-size: 16px;
-    margin-bottom: 8px;
+    font-size: 15px;
+    margin-bottom: 6px;
+    font-weight: 500;
   }
 
   .empty-subtext {
     font-size: 13px;
     opacity: 0.7;
   }
+`;
+
+const LoadingOverlay = styled.div`
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16px;
+  z-index: 10;
 `;
 
 const ConsumableStatistics = () => {
@@ -414,63 +560,73 @@ const ConsumableStatistics = () => {
     byCategory: [],
   });
   const [lowStockItems, setLowStockItems] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [dateRange, setDateRange] = useState([dayjs().subtract(30, 'days'), dayjs()]);
   const [categoryFilter, setCategoryFilter] = useState('all');
+  const [quickFilter, setQuickFilter] = useState('30days');
 
-  // 加载统计数据
+  const quickFilters = [
+    { key: 'today', label: '今日', days: 0 },
+    { key: '7days', label: '近7天', days: 7 },
+    { key: '30days', label: '近30天', days: 30 },
+    { key: '90days', label: '近90天', days: 90 },
+  ];
+
+  const loadCategories = async () => {
+    try {
+      const response = await consumableCategoryAPI.getList();
+      console.log('[分类] 返回数据:', response);
+      setCategories(response || []);
+    } catch (error) {
+      console.error('加载分类列表失败:', error);
+    }
+  };
+
   const loadStatistics = async () => {
     try {
       setLoading(true);
       const params = {
         startDate: dateRange[0]?.format('YYYY-MM-DD'),
         endDate: dateRange[1]?.format('YYYY-MM-DD'),
+        category: categoryFilter !== 'all' ? categoryFilter : undefined,
       };
 
-      // 加载记录统计
-      const statsResponse = await api.get('/consumable-records/statistics', { params });
-      setStats(statsResponse || {
-        inCount: 0,
-        outCount: 0,
-        inQuantity: 0,
-        outQuantity: 0,
-        recentRecords: [],
+      const statsResponse = await consumableRecordAPI.statistics(params);
+      console.log('[统计] 返回:', statsResponse);
+      console.log('[统计] 最近记录:', statsResponse?.recentRecords);
+      
+      setStats({
+        inCount: statsResponse?.inCount || 0,
+        outCount: statsResponse?.outCount || 0,
+        inQuantity: statsResponse?.inQuantity || 0,
+        outQuantity: statsResponse?.outQuantity || 0,
+        recentRecords: statsResponse?.recentRecords || [],
       });
 
-      // 加载汇总数据
-      const summaryResponse = await api.get('/consumables/statistics/summary');
-      setSummary(summaryResponse || {
-        total: 0,
-        lowStock: 0,
-        totalValue: 0,
-        byCategory: [],
+      const summaryResponse = await consumableAPI.getStatistics();
+      console.log('[汇总] 返回:', summaryResponse);
+      
+      setSummary({
+        total: summaryResponse?.total || 0,
+        lowStock: summaryResponse?.lowStock || 0,
+        totalValue: summaryResponse?.totalValue || 0,
+        byCategory: summaryResponse?.byCategory || [],
       });
     } catch (error) {
       const errorMsg = error?.message || error || '未知错误';
       message.error('加载统计数据失败: ' + errorMsg);
       console.error('加载统计数据失败:', error);
-      // 使用默认数据
-      setStats({
-        inCount: 0,
-        outCount: 0,
-        inQuantity: 0,
-        outQuantity: 0,
-        recentRecords: [],
-      });
-      setSummary({
-        total: 0,
-        lowStock: 0,
-        totalValue: 0,
-        byCategory: [],
-      });
+      setStats({ inCount: 0, outCount: 0, inQuantity: 0, outQuantity: 0, recentRecords: [] });
+      setSummary({ total: 0, lowStock: 0, totalValue: 0, byCategory: [] });
     } finally {
       setLoading(false);
     }
   };
 
-  // 加载低库存预警
   const loadLowStockItems = async () => {
     try {
-      const response = await api.get('/consumables/low-stock');
+      const response = await consumableAPI.getLowStock();
+      console.log('[低库存] 返回:', response);
       setLowStockItems(response || []);
     } catch (error) {
       console.error('加载低库存预警失败:', error?.message || error);
@@ -479,11 +635,56 @@ const ConsumableStatistics = () => {
   };
 
   useEffect(() => {
+    loadCategories();
     loadStatistics();
     loadLowStockItems();
   }, []);
 
-  // 低库存表格列
+  const handleQuickFilter = (key) => {
+    setQuickFilter(key);
+    const filter = quickFilters.find(f => f.key === key);
+    if (filter) {
+      if (filter.days === 0) {
+        setDateRange([dayjs().startOf('day'), dayjs()]);
+      } else {
+        setDateRange([dayjs().subtract(filter.days, 'days'), dayjs()]);
+      }
+    }
+  };
+
+  const handleRefresh = () => {
+    loadStatistics();
+    loadLowStockItems();
+    message.success('数据已刷新');
+  };
+
+  const handleExport = () => {
+    message.info('导出功能开发中...');
+  };
+
+  const getCategoryColor = (category) => {
+    const predefinedColors = [
+      '#6366f1', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6',
+      '#06b6d4', '#f97316', '#14b8a6', '#ef4444', '#3b82f6'
+    ];
+    
+    const colorMap = {
+      '网络设备': '#6366f1',
+      '线缆': '#10b981',
+      '配件': '#f59e0b',
+      '工具': '#ec4899',
+      '其他': '#6b7280',
+    };
+    
+    if (colorMap[category]) return colorMap[category];
+    
+    let hash = 0;
+    for (let i = 0; i < category.length; i++) {
+      hash = category.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return predefinedColors[Math.abs(hash) % predefinedColors.length];
+  };
+
   const lowStockColumns = [
     {
       title: '耗材名称',
@@ -492,20 +693,20 @@ const ConsumableStatistics = () => {
       render: (text, record) => (
         <Space>
           <Avatar
-            size={36}
+            size={34}
             style={{
-              background: designTokens.colors.warning.gradient,
-              fontSize: '16px',
+              background: `linear-gradient(135deg, ${designTokens.colors.warning.main}, #fb923c)`,
+              fontSize: '14px',
             }}
           >
             <WarningOutlined />
           </Avatar>
           <div>
-            <div style={{ fontWeight: 600, color: designTokens.colors.text.primary }}>
+            <div style={{ fontWeight: 600, color: designTokens.colors.text.primary, fontSize: '14px' }}>
               {text}
             </div>
             <div style={{ fontSize: '12px', color: designTokens.colors.text.secondary }}>
-              {record.specification}
+              {record.specification || '-'}
             </div>
           </div>
         </Space>
@@ -516,90 +717,101 @@ const ConsumableStatistics = () => {
       dataIndex: 'currentStock',
       key: 'currentStock',
       align: 'center',
+      width: 100,
       render: (currentStock, record) => (
-        <Text strong style={{ fontSize: '16px', color: designTokens.colors.error.main }}>
+        <Text strong style={{ fontSize: '15px', color: designTokens.colors.error.main }}>
           {currentStock} {record.unit}
         </Text>
       ),
     },
     {
-      title: '最小库存',
+      title: '安全库存',
       dataIndex: 'minStock',
       key: 'minStock',
       align: 'center',
+      width: 100,
       render: (minStock, record) => (
-        <Text type="secondary">
-          {minStock} {record.unit}
-        </Text>
+        <Text type="secondary">{minStock} {record.unit}</Text>
       ),
     },
     {
       title: '充足率',
       key: 'rate',
       align: 'center',
+      width: 140,
       render: (_, record) => {
-        const rate = Math.min(100, Math.round((record.currentStock / (record.maxStock || 100)) * 100));
-        const status = rate < 30 ? 'exception' : rate < 60 ? 'active' : 'success';
-        const color = rate < 30 ? designTokens.colors.error.main :
-                     rate < 60 ? designTokens.colors.warning.main :
+        const minStock = record.minStock || 0;
+        const currentStock = record.currentStock || 0;
+        
+        if (minStock <= 0) {
+          return <Text type="secondary" style={{ fontSize: '12px' }}>未设置</Text>;
+        }
+        
+        const rate = Math.min(100, Math.round((currentStock / minStock) * 100));
+        const color = rate < 50 ? designTokens.colors.error.main :
+                     rate < 100 ? designTokens.colors.warning.main :
                      designTokens.colors.success.main;
 
         return (
-          <ProgressBar color={color}>
+          <ProgressBar>
             <div className="progress-wrapper">
               <Progress
                 percent={rate}
                 size="small"
-                status={status}
                 strokeColor={color}
                 showInfo={false}
               />
-              <span className="progress-text" style={{ color }}>
-                {rate}%
-              </span>
+              <span className="progress-text" style={{ color }}>{rate}%</span>
             </div>
           </ProgressBar>
         );
       },
     },
-    {
-      title: '供应商',
-      dataIndex: 'supplier',
-      key: 'supplier',
-      render: (value) => (
-        <Text type="secondary">{value || '-'}</Text>
-      ),
-    },
   ];
 
-  // 最近记录表格列
   const recentColumns = [
     {
-      title: '操作类型',
+      title: '类型',
       dataIndex: 'type',
       key: 'type',
+      width: 80,
       render: (type) => (
         <Tag
           icon={type === 'in' ? <ArrowDownOutlined /> : <ArrowUpOutlined />}
           color={type === 'in' ? 'success' : 'processing'}
-          style={{
-            padding: '4px 12px',
-            borderRadius: designTokens.borderRadius.full,
-            fontWeight: 500,
-          }}
+          style={{ borderRadius: 12, fontWeight: 500, border: 'none' }}
         >
           {type === 'in' ? '入库' : '出库'}
         </Tag>
       ),
     },
     {
-      title: '耗材名称',
-      dataIndex: ['Consumable', 'name'],
+      title: '耗材',
+      dataIndex: 'consumableName',
       key: 'consumableName',
-      render: (text) => (
-        <Text strong style={{ color: designTokens.colors.text.primary }}>
-          {text}
-        </Text>
+      width: 200,
+      render: (text, record) => (
+        <Space>
+          <Avatar
+            size={30}
+            style={{
+              background: record.category ? getCategoryColor(record.category) : designTokens.colors.info.main,
+              fontSize: '12px',
+            }}
+          >
+            {record.category?.charAt(0) || '耗'}
+          </Avatar>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: '14px', color: designTokens.colors.text.primary }}>
+              {text || '-'}
+            </div>
+            {record.category && (
+              <div style={{ fontSize: '12px', color: designTokens.colors.text.secondary }}>
+                {record.category}
+              </div>
+            )}
+          </div>
+        </Space>
       ),
     },
     {
@@ -607,15 +819,16 @@ const ConsumableStatistics = () => {
       dataIndex: 'quantity',
       key: 'quantity',
       align: 'center',
+      width: 90,
       render: (quantity, record) => (
         <Text
           strong
           style={{
-            fontSize: '16px',
-            color: record.type === 'in' ? designTokens.colors.success.main : designTokens.colors.primary.main,
+            fontSize: '15px',
+            color: record.type === 'in' ? designTokens.colors.success.main : designTokens.colors.error.main,
           }}
         >
-          {record.type === 'in' ? '+' : '-'}{quantity}
+          {record.type === 'in' ? '+' : '-'}{quantity} {record.unit || '个'}
         </Text>
       ),
     },
@@ -623,55 +836,40 @@ const ConsumableStatistics = () => {
       title: '操作人',
       dataIndex: 'operator',
       key: 'operator',
+      width: 100,
       render: (operator) => (
-        <Space>
-          <Avatar size={28} style={{ background: designTokens.colors.info.main }}>
+        <Space size={6}>
+          <Avatar size={24} style={{ background: designTokens.colors.info.main, fontSize: '12px' }}>
             {operator?.charAt(0) || '?'}
           </Avatar>
-          <Text>{operator}</Text>
+          <Text style={{ fontSize: '13px' }}>{operator || '-'}</Text>
         </Space>
       ),
     },
     {
-      title: '操作时间',
+      title: '时间',
       dataIndex: 'createdAt',
       key: 'createdAt',
+      width: 140,
       render: (date) => (
-        <Text type="secondary" style={{ fontSize: '13px' }}>
-          <CalendarOutlined style={{ marginRight: 6 }} />
-          {dayjs(date).format('YYYY-MM-DD HH:mm')}
+        <Text type="secondary" style={{ fontSize: '12px' }}>
+          {dayjs(date).format('MM-DD HH:mm')}
         </Text>
       ),
     },
   ];
 
-  // 获取类别颜色
-  const getCategoryColor = (category) => {
-    const colors = {
-      '网络设备': '#6366f1',
-      '线缆': '#10b981',
-      '配件': '#f59e0b',
-      '工具': '#ec4899',
-      '其他': '#6b7280',
-    };
-    return colors[category] || '#6366f1';
-  };
-
-  // 刷新数据
-  const handleRefresh = () => {
-    loadStatistics();
-    loadLowStockItems();
-    message.success('数据已刷新');
-  };
+  const netQuantity = useMemo(() => {
+    return (stats?.inQuantity || 0) - (stats?.outQuantity || 0);
+  }, [stats]);
 
   return (
     <PageContainer>
-      {/* 页面标题 */}
-      <PageHeader variants={containerVariants} initial="hidden" animate="visible">
+      <PageHeader variants={itemVariants} initial="hidden" animate="visible">
         <TitleSection>
           <motion.div
             className="icon-wrapper"
-            whileHover={{ scale: 1.05, rotate: 5 }}
+            whileHover={{ scale: 1.05, rotate: 3 }}
             transition={{ type: 'spring', stiffness: 400 }}
           >
             <BarChartOutlined />
@@ -683,386 +881,312 @@ const ConsumableStatistics = () => {
         </TitleSection>
         <Space>
           <Button
+            icon={<ExportOutlined />}
+            onClick={handleExport}
+            style={{
+              height: 38,
+              borderRadius: 10,
+              borderColor: designTokens.colors.border,
+            }}
+          >
+            导出报表
+          </Button>
+          <Button
+            type="primary"
             icon={<ReloadOutlined />}
             onClick={handleRefresh}
             loading={loading}
             style={{
-              height: 40,
-              borderRadius: designTokens.borderRadius.medium,
-              borderColor: designTokens.colors.border,
+              height: 38,
+              borderRadius: 10,
+              background: designTokens.colors.primary.gradient,
+              border: 'none',
             }}
           >
-            刷新数据
+            刷新
           </Button>
         </Space>
       </PageHeader>
 
-      {/* 筛选区域 */}
-      <FilterSection variants={itemVariants}>
-        <Row gutter={[16, 16]} align="middle">
-          <Col xs={24} sm={12} md={8} lg={6}>
-            <Text strong style={{ display: 'block', marginBottom: 8, color: designTokens.colors.text.primary }}>
-              <CalendarOutlined style={{ marginRight: 8 }} />
-              时间范围
-            </Text>
-            <RangePicker
-              value={dateRange}
-              onChange={setDateRange}
-              style={datePickerStyles.range}
-              allowClear={false}
-              placeholder={inputPlaceholders.dateRange}
-            />
-          </Col>
-          <Col xs={24} sm={12} md={8} lg={6}>
-            <Text strong style={{ display: 'block', marginBottom: 8, color: designTokens.colors.text.primary }}>
-              <AppstoreOutlined style={{ marginRight: 8 }} />
-              耗材类别
-            </Text>
-            <Select
-              value={categoryFilter}
-              onChange={setCategoryFilter}
-              style={selectStyles.base}
-              placeholder="选择类别"
-            >
-              <Option value="all">全部类别</Option>
-              <Option value="网络设备">网络设备</Option>
-              <Option value="线缆">线缆</Option>
-              <Option value="配件">配件</Option>
-              <Option value="工具">工具</Option>
-              <Option value="其他">其他</Option>
-            </Select>
-          </Col>
-          <Col xs={24} sm={24} md={8} lg={12} style={{ display: 'flex', alignItems: 'flex-end' }}>
-            <Button
-              type="primary"
-              onClick={loadStatistics}
-              loading={loading}
-              style={{
-                height: '40px',
-                borderRadius: designTokens.borderRadius.medium,
-                background: designTokens.colors.primary.gradient,
-                border: 'none',
-              }}
-            >
-              应用筛选
-            </Button>
-          </Col>
-        </Row>
-      </FilterSection>
+      <QuickFilterBar variants={containerVariants} initial="hidden" animate="visible">
+        {quickFilters.map(filter => (
+          <QuickFilterBtn
+            key={filter.key}
+            $active={quickFilter === filter.key}
+            onClick={() => handleQuickFilter(filter.key)}
+          >
+            {filter.label}
+          </QuickFilterBtn>
+        ))}
+      </QuickFilterBar>
 
-      {/* 统计卡片 */}
-      <motion.div
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-      >
-        <Row gutter={[24, 24]} style={{ marginBottom: 24 }}>
-          <Col xs={24} sm={12} lg={6}>
-            <StatsCard
-              variants={itemVariants}
-              whileHover="hover"
-              accent={designTokens.colors.primary.gradient}
-              iconBg="rgba(99, 102, 241, 0.1)"
-              iconColor={designTokens.colors.primary.main}
-              valueGradient={designTokens.colors.primary.gradient}
-            >
-              <div className="card-header">
-                <div className="icon-box">
-                  <DatabaseOutlined />
-                </div>
-                <span className="card-title">耗材总数</span>
-              </div>
-              <div className="stat-value">
-                {summary?.total || 0}
-              </div>
-              <div className="stat-label">种不同类型耗材</div>
-            </StatsCard>
-          </Col>
+      <FilterCard variants={itemVariants}>
+        <FilterItem>
+          <span className="filter-label">时间范围</span>
+          <RangePicker
+            value={dateRange}
+            onChange={(dates) => {
+              setDateRange(dates);
+              setQuickFilter(null);
+            }}
+            style={{ ...datePickerStyles.range, width: 280 }}
+            allowClear={false}
+          />
+        </FilterItem>
+        <FilterItem>
+          <span className="filter-label">耗材类别</span>
+          <Select
+            value={categoryFilter}
+            onChange={setCategoryFilter}
+            style={{ ...selectStyles.base, width: 160 }}
+          >
+            <Option value="all">全部类别</Option>
+            {categories.map(cat => (
+              <Option key={cat.id} value={cat.name}>{cat.name}</Option>
+            ))}
+          </Select>
+        </FilterItem>
+        <Button
+          type="primary"
+          onClick={loadStatistics}
+          loading={loading}
+          style={{
+            height: 38,
+            borderRadius: 10,
+            background: designTokens.colors.primary.gradient,
+            border: 'none',
+            marginLeft: 'auto',
+          }}
+        >
+          应用筛选
+        </Button>
+      </FilterCard>
 
-          <Col xs={24} sm={12} lg={6}>
-            <StatsCard
-              variants={itemVariants}
-              whileHover="hover"
-              accent={designTokens.colors.warning.gradient}
-              iconBg="rgba(245, 158, 11, 0.1)"
-              iconColor={designTokens.colors.warning.main}
-            >
-              <div className="card-header">
-                <div className="icon-box" style={{ color: designTokens.colors.warning.main, background: 'rgba(245, 158, 11, 0.1)' }}>
-                  <WarningOutlined />
-                </div>
-                <span className="card-title">库存预警</span>
-              </div>
-              <div className="stat-value" style={{ color: designTokens.colors.warning.main }}>
-                {summary?.lowStock || 0}
-              </div>
-              <div className="stat-label">低于安全库存</div>
-            </StatsCard>
-          </Col>
+      <StatsGrid variants={containerVariants} initial="hidden" animate="visible">
+        <StatsCard
+          variants={itemVariants}
+          $accent={designTokens.colors.primary.gradient}
+          $iconBg="rgba(99, 102, 241, 0.1)"
+          $iconColor={designTokens.colors.primary.main}
+          whileHover={{ y: -4 }}
+        >
+          <div className="card-icon"><DatabaseOutlined /></div>
+          <div className="card-value">{summary?.total || 0}</div>
+          <div className="card-label">耗材种类</div>
+        </StatsCard>
 
-          <Col xs={24} sm={12} lg={6}>
-            <StatsCard
-              variants={itemVariants}
-              whileHover="hover"
-              accent={designTokens.colors.success.gradient}
-              iconBg="rgba(16, 185, 129, 0.1)"
-              iconColor={designTokens.colors.success.main}
-            >
-              <div className="card-header">
-                <div className="icon-box" style={{ color: designTokens.colors.success.main, background: 'rgba(16, 185, 129, 0.1)' }}>
-                  <ArrowDownOutlined />
-                </div>
-                <span className="card-title">本月入库</span>
-              </div>
-              <div className="stat-value" style={{ color: designTokens.colors.success.main }}>
-                {stats?.inCount || 0}
-              </div>
-              <div className="stat-label">笔入库记录</div>
-            </StatsCard>
-          </Col>
+        <StatsCard
+          variants={itemVariants}
+          $accent={designTokens.colors.warning.gradient}
+          $iconBg="rgba(245, 158, 11, 0.1)"
+          $iconColor={designTokens.colors.warning.main}
+          whileHover={{ y: -4 }}
+        >
+          <div className="card-icon"><WarningOutlined /></div>
+          <div className="card-value" style={{ color: designTokens.colors.warning.main }}>
+            {summary?.lowStock || 0}
+          </div>
+          <div className="card-label">库存预警</div>
+          {summary?.lowStock > 0 && (
+            <div className="card-trend down">
+              <ExclamationCircleOutlined /> 需关注
+            </div>
+          )}
+        </StatsCard>
 
-          <Col xs={24} sm={12} lg={6}>
-            <StatsCard
-              variants={itemVariants}
-              whileHover="hover"
-              accent={designTokens.colors.secondary.gradient}
-              iconBg="rgba(236, 72, 153, 0.1)"
-              iconColor={designTokens.colors.secondary.main}
-            >
-              <div className="card-header">
-                <div className="icon-box" style={{ color: designTokens.colors.secondary.main, background: 'rgba(236, 72, 153, 0.1)' }}>
-                  <ArrowUpOutlined />
-                </div>
-                <span className="card-title">本月出库</span>
-              </div>
-              <div className="stat-value" style={{ color: designTokens.colors.secondary.main }}>
-                {stats?.outCount || 0}
-              </div>
-              <div className="stat-label">笔出库记录</div>
-            </StatsCard>
-          </Col>
-        </Row>
-      </motion.div>
+        <StatsCard
+          variants={itemVariants}
+          $accent={designTokens.colors.success.gradient}
+          $iconBg="rgba(16, 185, 129, 0.1)"
+          $iconColor={designTokens.colors.success.main}
+          whileHover={{ y: -4 }}
+        >
+          <div className="card-icon"><ArrowDownOutlined /></div>
+          <div className="card-value" style={{ color: designTokens.colors.success.main }}>
+            {stats?.inQuantity || 0}
+          </div>
+          <div className="card-label">期间入库</div>
+        </StatsCard>
 
-      {/* 入库/出库统计 */}
-      <motion.div
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-        style={{ marginBottom: 24 }}
-      >
-        <ContentCard variants={itemVariants} iconBg={designTokens.colors.info.gradient}>
+        <StatsCard
+          variants={itemVariants}
+          $accent={designTokens.colors.secondary.gradient}
+          $iconBg="rgba(236, 72, 153, 0.1)"
+          $iconColor={designTokens.colors.secondary.main}
+          whileHover={{ y: -4 }}
+        >
+          <div className="card-icon"><ArrowUpOutlined /></div>
+          <div className="card-value" style={{ color: designTokens.colors.secondary.main }}>
+            {stats?.outQuantity || 0}
+          </div>
+          <div className="card-label">期间出库</div>
+        </StatsCard>
+      </StatsGrid>
+
+      <BentoGrid variants={containerVariants} initial="hidden" animate="visible">
+        <BentoCard variants={itemVariants} $col="span 6" $iconBg={designTokens.colors.info.gradient}>
           <div className="card-header">
             <div className="header-left">
-              <div className="header-icon" style={{ background: designTokens.colors.info.gradient }}>
-                <ShoppingCartOutlined />
-              </div>
-              <span className="header-title">入库/出库统计</span>
+              <div className="header-icon"><ShoppingCartOutlined /></div>
+              <span className="header-title">出入库统计</span>
             </div>
             <div className="header-extra">
-              {dateRange[0]?.format('YYYY-MM-DD')} 至 {dateRange[1]?.format('YYYY-MM-DD')}
+              {dateRange[0]?.format('MM/DD')} - {dateRange[1]?.format('MM/DD')}
             </div>
           </div>
           <div className="card-body">
-            <Row gutter={[48, 24]}>
-              <Col xs={24} md={12}>
-                <StatItem bg="rgba(16, 185, 129, 0.05)" iconColor={designTokens.colors.success.main}>
-                  <div className="stat-icon">
-                    <ArrowDownOutlined />
-                  </div>
-                  <div className="stat-number" style={{ color: designTokens.colors.success.main }}>
-                {stats?.inCount || 0}
-              </div>
-              <div className="stat-label">入库次数</div>
-                </StatItem>
-              </Col>
-              <Col xs={24} md={12}>
-                <StatItem bg="rgba(99, 102, 241, 0.05)" iconColor={designTokens.colors.primary.main}>
-                  <div className="stat-icon">
-                    <ArrowUpOutlined />
-                  </div>
-                  <div className="stat-number" style={{ color: designTokens.colors.primary.main }}>
-                {stats?.outCount || 0}
-              </div>
-              <div className="stat-label">出库次数</div>
-                </StatItem>
-              </Col>
-              <Col xs={24} md={12}>
-                <StatItem bg="rgba(16, 185, 129, 0.05)" iconColor={designTokens.colors.success.main}>
-                  <div className="stat-icon">
-                    <DatabaseOutlined />
-                  </div>
-                  <div className="stat-number" style={{ color: designTokens.colors.success.main }}>
-                {stats?.inQuantity || 0}
-              </div>
-              <div className="stat-label">入库数量</div>
-                </StatItem>
-              </Col>
-              <Col xs={24} md={12}>
-                <StatItem bg="rgba(99, 102, 241, 0.05)" iconColor={designTokens.colors.primary.main}>
-                  <div className="stat-icon">
-                    <BoxPlotOutlined />
-                  </div>
-                  <div className="stat-number" style={{ color: designTokens.colors.primary.main }}>
-                {stats?.outQuantity || 0}
-              </div>
-              <div className="stat-label">出库数量</div>
-                </StatItem>
-              </Col>
-            </Row>
+            <InOutComparison>
+              <ComparisonItem
+                $bg="rgba(16, 185, 129, 0.04)"
+                $color={designTokens.colors.success.main}
+              >
+                <div className="item-icon"><ArrowDownOutlined /></div>
+                <div className="item-value">{stats?.inCount || 0}</div>
+                <div className="item-label">入库次数</div>
+                <div className="item-sub">共 <strong>{stats?.inQuantity || 0}</strong> 件</div>
+              </ComparisonItem>
+              <ComparisonItem
+                $bg="rgba(99, 102, 241, 0.04)"
+                $color={designTokens.colors.primary.main}
+              >
+                <div className="item-icon"><ArrowUpOutlined /></div>
+                <div className="item-value">{stats?.outCount || 0}</div>
+                <div className="item-label">出库次数</div>
+                <div className="item-sub">共 <strong>{stats?.outQuantity || 0}</strong> 件</div>
+              </ComparisonItem>
+            </InOutComparison>
+            <div style={{ 
+              marginTop: 20, 
+              padding: '16px', 
+              background: netQuantity >= 0 ? 'rgba(16, 185, 129, 0.06)' : 'rgba(239, 68, 68, 0.06)',
+              borderRadius: 12,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+            }}>
+              {netQuantity >= 0 ? (
+                <>
+                  <RiseOutlined style={{ color: designTokens.colors.success.main, fontSize: 18 }} />
+                  <Text style={{ color: designTokens.colors.success.main, fontWeight: 600 }}>
+                    净入库 +{netQuantity} 件
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <FallOutlined style={{ color: designTokens.colors.error.main, fontSize: 18 }} />
+                  <Text style={{ color: designTokens.colors.error.main, fontWeight: 600 }}>
+                    净出库 {netQuantity} 件
+                  </Text>
+                </>
+              )}
+            </div>
           </div>
-        </ContentCard>
-      </motion.div>
+        </BentoCard>
 
-      {/* 类别统计 */}
-      <motion.div
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-        style={{ marginBottom: 24 }}
-      >
-        <ContentCard variants={itemVariants} iconBg={designTokens.colors.secondary.gradient}>
+        <BentoCard variants={itemVariants} $col="span 6" $iconBg={designTokens.colors.secondary.gradient}>
           <div className="card-header">
             <div className="header-left">
-              <div className="header-icon" style={{ background: designTokens.colors.secondary.gradient }}>
-                <PieChartOutlined />
-              </div>
-              <span className="header-title">类别统计</span>
+              <div className="header-icon"><PieChartOutlined /></div>
+              <span className="header-title">类别分布</span>
             </div>
           </div>
           <div className="card-body">
             {summary?.byCategory?.length > 0 ? (
-              <Row gutter={[24, 24]}>
-                {summary.byCategory.map((item, index) => (
-                  <Col xs={24} sm={12} md={8} lg={6} key={item.category}>
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ delay: index * 0.1 }}
-                      whileHover={{ scale: 1.03 }}
-                      style={{
-                        padding: 20,
-                        background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
-                        borderRadius: designTokens.borderRadius.medium,
-                        border: `1px solid ${designTokens.colors.border}`,
-                        textAlign: 'center',
-                      }}
-                    >
-                      <CategoryTag
-                        color={getCategoryColor(item.category)}
-                        style={{
-                          background: `${getCategoryColor(item.category)}15`,
-                          marginBottom: 16,
-                          fontSize: '14px',
-                          padding: '6px 16px',
-                        }}
-                      >
-                        <span
-                          className="dot"
-                          style={{ background: getCategoryColor(item.category) }}
-                        />
-                        {item.category}
-                      </CategoryTag>
-                      <div style={{ fontSize: '28px', fontWeight: 700, color: designTokens.colors.text.primary }}>
-                        {item.count}
-                      </div>
-                      <div style={{ fontSize: '13px', color: designTokens.colors.text.secondary, marginTop: 4 }}>
-                        种耗材
-                      </div>
-                      <Divider style={{ margin: '12px 0' }} />
-                      <div style={{ fontSize: '13px', color: designTokens.colors.text.secondary }}>
-                        总库存: <Text strong>{item.totalQuantity || 0}</Text>
-                      </div>
-                    </motion.div>
-                  </Col>
+              <CategoryGrid>
+                {summary.byCategory.slice(0, 8).map((item, index) => (
+                  <CategoryCard
+                    key={item.category}
+                    $color={getCategoryColor(item.category)}
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: index * 0.05 }}
+                  >
+                    <div className="category-badge">
+                      <span className="dot" />
+                      {item.category}
+                    </div>
+                    <div className="category-count">{item.count}</div>
+                    <div className="category-label">种耗材</div>
+                    <div className="category-stock">
+                      库存: <strong>{item.totalQuantity || 0}</strong>
+                    </div>
+                  </CategoryCard>
                 ))}
-              </Row>
+              </CategoryGrid>
             ) : (
               <EmptyState>
                 <PieChartOutlined className="empty-icon" />
-                <div className="empty-text">暂无类别统计数据</div>
+                <div className="empty-text">暂无类别数据</div>
                 <div className="empty-subtext">添加耗材后将自动统计</div>
               </EmptyState>
             )}
           </div>
-        </ContentCard>
-      </motion.div>
+        </BentoCard>
+      </BentoGrid>
 
-      {/* 低库存预警和最近记录 */}
-      <motion.div
-        variants={containerVariants}
-        initial="hidden"
-        animate="visible"
-      >
-        <Row gutter={[24, 24]}>
-          <Col xs={24} lg={12}>
-            <ContentCard variants={itemVariants} iconBg={designTokens.colors.warning.gradient}>
-              <div className="card-header">
-                <div className="header-left">
-                  <div className="header-icon" style={{ background: designTokens.colors.warning.gradient }}>
-                    <ExclamationCircleOutlined />
-                  </div>
-                  <span className="header-title">库存预警</span>
-                </div>
-                <Badge
-                  count={lowStockItems.length}
-                  style={{ backgroundColor: designTokens.colors.warning.main }}
-                />
-              </div>
-              <div className="card-body" style={{ padding: 0 }}>
-                <StyledTable
-                  columns={lowStockColumns}
-                  dataSource={lowStockItems}
-                  rowKey="consumableId"
-                  pagination={false}
-                  scroll={{ x: 'max-content' }}
-                  locale={{
-                    emptyText: (
-                      <EmptyState>
-                        <BoxPlotOutlined className="empty-icon" style={{ color: designTokens.colors.success.main }} />
-                        <div className="empty-text">库存充足</div>
-                        <div className="empty-subtext">所有耗材库存均在安全范围内</div>
-                      </EmptyState>
-                    ),
-                  }}
-                />
-              </div>
-            </ContentCard>
-          </Col>
+      <BentoGrid variants={containerVariants} initial="hidden" animate="visible">
+        <BentoCard variants={itemVariants} $col="span 6" $iconBg={designTokens.colors.warning.gradient}>
+          <div className="card-header">
+            <div className="header-left">
+              <div className="header-icon"><ExclamationCircleOutlined /></div>
+              <span className="header-title">库存预警</span>
+            </div>
+            <Badge
+              count={lowStockItems.length}
+              style={{ backgroundColor: designTokens.colors.warning.main }}
+            />
+          </div>
+          <div className="card-body" style={{ padding: 0 }}>
+            <StyledTable
+              columns={lowStockColumns}
+              dataSource={lowStockItems}
+              rowKey="consumableId"
+              pagination={false}
+              size="small"
+              scroll={{ x: 'max-content' }}
+              locale={{
+                emptyText: (
+                  <EmptyState>
+                    <BoxPlotOutlined className="empty-icon" style={{ color: designTokens.colors.success.main }} />
+                    <div className="empty-text">库存充足</div>
+                    <div className="empty-subtext">所有耗材均在安全范围内</div>
+                  </EmptyState>
+                ),
+              }}
+            />
+          </div>
+        </BentoCard>
 
-          <Col xs={24} lg={12}>
-            <ContentCard variants={itemVariants} iconBg={designTokens.colors.success.gradient}>
-              <div className="card-header">
-                <div className="header-left">
-                  <div className="header-icon" style={{ background: designTokens.colors.success.gradient }}>
-                    <HistoryOutlined />
-                  </div>
-                  <span className="header-title">最近记录</span>
-                </div>
-                <div className="header-extra">最近10条</div>
-              </div>
-              <div className="card-body" style={{ padding: 0 }}>
-                <StyledTable
-                  columns={recentColumns}
-                  dataSource={stats?.recentRecords || []}
-                  rowKey="recordId"
-                  pagination={false}
-                  scroll={{ x: 'max-content' }}
-                  locale={{
-                    emptyText: (
-                      <EmptyState>
-                        <HistoryOutlined className="empty-icon" />
-                        <div className="empty-text">暂无记录</div>
-                        <div className="empty-subtext">出入库操作后将显示在这里</div>
-                      </EmptyState>
-                    ),
-                  }}
-                />
-              </div>
-            </ContentCard>
-          </Col>
-        </Row>
-      </motion.div>
+        <BentoCard variants={itemVariants} $col="span 6" $iconBg={designTokens.colors.success.gradient}>
+          <div className="card-header">
+            <div className="header-left">
+              <div className="header-icon"><HistoryOutlined /></div>
+              <span className="header-title">最近记录</span>
+            </div>
+            <div className="header-extra">最近10条</div>
+          </div>
+          <div className="card-body" style={{ padding: 0 }}>
+            <StyledTable
+              columns={recentColumns}
+              dataSource={stats?.recentRecords || []}
+              rowKey="recordId"
+              pagination={false}
+              size="small"
+              scroll={{ x: 'max-content' }}
+              locale={{
+                emptyText: (
+                  <EmptyState>
+                    <HistoryOutlined className="empty-icon" />
+                    <div className="empty-text">暂无记录</div>
+                    <div className="empty-subtext">出入库操作后将显示</div>
+                  </EmptyState>
+                ),
+              }}
+            />
+          </div>
+        </BentoCard>
+      </BentoGrid>
     </PageContainer>
   );
 };

@@ -473,7 +473,7 @@ const InventoryManagement = () => {
   ];
 
   return (
-    <div style={{ padding: 24, background: designTokens.colors.bg, minHeight: '100vh' }}>
+    <div style={{ padding: 24, background: designTokens.colors.background.secondary, minHeight: '100vh' }}>
       <div style={{ marginBottom: 24 }}>
         <Row gutter={[16, 16]}>
           {statCards.map((stat, index) => (

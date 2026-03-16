@@ -34,7 +34,7 @@ router.get('/', async (req, res) => {
     const { count, rows } = await ConsumableRecord.findAndCountAll({
       where,
       include: [
-        { model: Consumable, attributes: ['name', 'category', 'unit'] }
+        { model: Consumable, as: 'consumable', attributes: ['name', 'category', 'unit'] }
       ],
       offset,
       limit: parseInt(pageSize),
@@ -123,17 +123,36 @@ router.post('/', async (req, res) => {
 
 router.get('/statistics', async (req, res) => {
   try {
-    const { startDate, endDate } = req.query;
+    const { startDate, endDate, category } = req.query;
 
     const dateWhere = {};
     if (startDate && endDate) {
+      // 修复日期范围查询：startDate 从 00:00:00 开始，endDate 到 23:59:59 结束
+      const startDateTime = new Date(startDate);
+      const endDateTime = new Date(endDate);
+      endDateTime.setHours(23, 59, 59, 999); // 设置 endDate 为当天最后一刻
+      
       dateWhere.createdAt = {
-        [Op.between]: [new Date(startDate), new Date(endDate)]
+        [Op.gte]: startDateTime,
+        [Op.lte]: endDateTime
       };
+    }
+
+    const consumableWhere = {};
+    if (category) {
+      consumableWhere.category = category;
     }
 
     const records = await ConsumableRecord.findAll({
       where: dateWhere,
+      include: [
+        { 
+          model: Consumable, 
+          as: 'consumable',
+          attributes: ['name', 'category'],
+          where: Object.keys(consumableWhere).length > 0 ? consumableWhere : undefined
+        }
+      ],
       attributes: ['type', 'quantity']
     });
 
@@ -163,7 +182,12 @@ router.get('/statistics', async (req, res) => {
     const recentRecords = await ConsumableRecord.findAll({
       where: dateWhere,
       include: [
-        { model: Consumable, attributes: ['name', 'category'] }
+        { 
+          model: Consumable, 
+          as: 'consumable',
+          attributes: ['name', 'category'],
+          where: Object.keys(consumableWhere).length > 0 ? consumableWhere : undefined
+        }
       ],
       order: [['createdAt', 'DESC']],
       limit: 10
@@ -180,7 +204,17 @@ router.get('/statistics', async (req, res) => {
         totalQuantity: data.totalQuantity,
         count: data.count
       })),
-      recentRecords
+      recentRecords: recentRecords.map(record => ({
+        recordId: record.recordId,
+        type: record.type,
+        quantity: record.quantity,
+        operator: record.operator,
+        createdAt: record.createdAt,
+        consumableId: record.consumableId,
+        consumableName: record.consumable?.name || '未知耗材',
+        category: record.consumable?.category || null,
+        unit: record.consumable?.unit || '个'
+      }))
     });
   } catch (error) {
     res.status(500).json({ error: error.message });

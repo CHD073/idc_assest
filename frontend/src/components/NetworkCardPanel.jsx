@@ -20,7 +20,7 @@ import {
   CloudServerOutlined,
   FolderOutlined,
 } from '@ant-design/icons';
-import axios from 'axios';
+import api from '../api';
 import PortCreateModal from './PortCreateModal';
 import NetworkCardCreateModal from './NetworkCardCreateModal';
 import { designTokens } from '../config/theme';
@@ -42,13 +42,13 @@ function NetworkCardPanel({ deviceId, deviceName, onRefresh, refreshTrigger }) {
     try {
       setLoading(true);
       const [cardsResponse, networkCardsResponse] = await Promise.all([
-        axios.get(`/api/network-cards/device/${deviceId}/with-ports`),
-        axios.get(`/api/network-cards/device/${deviceId}`),
+        api.get(`/network-cards/device/${deviceId}/with-ports`),
+        api.get(`/network-cards/device/${deviceId}`),
       ]);
 
-      const cardsData = cardsResponse.data || [];
+      const cardsData = cardsResponse.data || cardsResponse || [];
       setCards(cardsData);
-      setNetworkCards(networkCardsResponse.data || []);
+      setNetworkCards(networkCardsResponse.data || networkCardsResponse || []);
 
       const initialExpanded = cardsData
         .filter(card => card.ports && card.ports.length > 0)
@@ -70,7 +70,7 @@ function NetworkCardPanel({ deviceId, deviceName, onRefresh, refreshTrigger }) {
   const handleDeleteCard = useCallback(
     async card => {
       try {
-        await axios.delete(`/api/network-cards/${card.nicId}`);
+        await api.delete(`/network-cards/${card.nicId}`);
         import('antd').then(({ message }) => message.success('网卡删除成功'));
         fetchData();
         onRefresh?.();
@@ -86,7 +86,7 @@ function NetworkCardPanel({ deviceId, deviceName, onRefresh, refreshTrigger }) {
   const handleDeletePort = useCallback(
     async port => {
       try {
-        await axios.delete(`/api/device-ports/${port.portId}`);
+        await api.delete(`/device-ports/${port.portId}`);
         import('antd').then(({ message }) => message.success('端口删除成功'));
         fetchData();
         onRefresh?.();

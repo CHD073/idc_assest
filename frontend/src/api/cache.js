@@ -1,3 +1,5 @@
+import api from './index';
+
 const cacheManager = (() => {
   const cache = new Map();
   const cacheTimestamps = new Map();
@@ -269,6 +271,11 @@ export const consumableLogAPI = {
   create: data => cachedAPI.post('/consumables/logs', data),
   export: params => api.get('/consumables/logs/export', { params, responseType: 'blob' }),
   import: data => cachedAPI.post('/consumables/logs/import', data),
+};
+
+export const consumableRecordAPI = {
+  list: params => cachedAPI.get('/consumable-records', params),
+  statistics: params => api.get('/consumable-records/statistics', { params }),
 };
 
 export const ticketCategoryAPI = {

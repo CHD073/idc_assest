@@ -645,7 +645,7 @@ const PendingDeviceManagement = () => {
   ];
 
   return (
-    <div style={{ padding: 24, background: designTokens.colors.bg, minHeight: '100vh' }}>
+    <div style={{ padding: 24, background: designTokens.colors.background.secondary, minHeight: '100vh' }}>
       <Row gutter={16} style={{ marginBottom: 24 }}>
         <Col span={6}>
           <Card bordered={false} style={{ borderRadius: 12 }}>

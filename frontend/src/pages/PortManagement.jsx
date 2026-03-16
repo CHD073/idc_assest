@@ -25,6 +25,7 @@ import {
   Skeleton,
   Alert,
   Typography,
+  Divider,
 } from 'antd';
 import {
   PlusOutlined,
@@ -45,8 +46,10 @@ import {
   CheckCircleOutlined,
   ExclamationCircleOutlined,
   DisconnectOutlined,
+  UpOutlined,
+  DownOutlined,
 } from '@ant-design/icons';
-import axios from 'axios';
+import api from '../api';
 import * as XLSX from 'xlsx';
 import Papa from 'papaparse';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -136,8 +139,8 @@ function PortManagement() {
       if (filters.portType !== 'all') params.portType = filters.portType;
       if (filters.portSpeed !== 'all') params.portSpeed = filters.portSpeed;
 
-      const response = await axios.get('/api/device-ports', { params });
-      const portsData = response.data.ports || response.data || [];
+      const response = await api.get('/device-ports', { params });
+      const portsData = response.ports || response || [];
       
       // 搜索过滤
       let filteredPorts = portsData;
@@ -166,8 +169,8 @@ function PortManagement() {
       if (keyword && keyword.trim()) {
         params.keyword = keyword.trim();
       }
-      const response = await axios.get('/api/devices', { params });
-      setDevices(response.data.devices || response.data || []);
+      const response = await api.get('/devices', { params });
+      setDevices(response.devices || response || []);
     } catch (error) {
       message.error('获取设备列表失败');
       console.error('获取设备列表失败:', error);
@@ -185,8 +188,8 @@ function PortManagement() {
 
   const fetchCables = useCallback(async () => {
     try {
-      const response = await axios.get('/api/cables');
-      setCables(response.data.cables || response.data || []);
+      const response = await api.get('/cables');
+      setCables(response.cables || response || []);
     } catch (error) {
       console.error('获取接线列表失败:', error);
     }
@@ -296,7 +299,7 @@ function PortManagement() {
 
   const handleDelete = async portId => {
     try {
-      await axios.delete(`/api/device-ports/${portId}`);
+      await api.delete(`/device-ports/${portId}`);
       message.success({
         content: '删除成功',
         icon: <CheckCircleOutlined style={{ color: designTokens.colors.success.main }} />,
@@ -327,7 +330,7 @@ function PortManagement() {
       const values = await form.validateFields();
 
       if (editingPort) {
-        await axios.put(`/api/device-ports/${editingPort.portId}`, values);
+        await api.put(`/device-ports/${editingPort.portId}`, values);
         message.success({
           content: '更新成功',
           icon: <CheckCircleOutlined style={{ color: designTokens.colors.success.main }} />,
@@ -347,7 +350,7 @@ function PortManagement() {
             description: values.description,
           }));
 
-          const response = await axios.post('/api/device-ports/batch', { ports: portsData });
+          const response = await api.post('/device-ports/batch', { ports: portsData });
           const { success, failed } = response.data;
 
           if (failed > 0) {
@@ -359,7 +362,7 @@ function PortManagement() {
             });
           }
         } else {
-          await axios.post('/api/device-ports', values);
+          await api.post('/device-ports', values);
           message.success({
             content: '创建成功',
             icon: <CheckCircleOutlined style={{ color: designTokens.colors.success.main }} />,
@@ -498,8 +501,8 @@ function PortManagement() {
         description: row['描述'],
       }));
 
-      const response = await axios.post('/api/device-ports/batch', { ports: portsData });
-      const { total, success, failed, errors } = response.data;
+      const response = await api.post('/device-ports/batch', { ports: portsData });
+      const { total, success, failed, errors } = response;
 
       setImportProgress({ current: total, total: total });
 
@@ -972,138 +975,135 @@ function PortManagement() {
               loadMoreCount={5}
             />
           ) : (
-            <Collapse
-              activeKey={expandedKeys}
-              onChange={setExpandedKeys}
-              style={{ background: 'transparent', border: 'none' }}
-              expandIconPosition="end"
-            >
-              <AnimatePresence>
-                {Object.entries(groupedPorts).map(([deviceId, data], index) => {
-                  const device = data.device;
-                  const devicePorts = data.ports || [];
-                  const freeCount = devicePorts.filter(p => p.status === 'free').length;
-                  const occupiedCount = devicePorts.filter(p => p.status === 'occupied').length;
-                  const faultCount = devicePorts.filter(p => p.status === 'fault').length;
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              {Object.entries(groupedPorts).map(([deviceId, data], index) => {
+                const device = data.device;
+                const devicePorts = data.ports || [];
+                const freeCount = devicePorts.filter(p => p.status === 'free').length;
+                const occupiedCount = devicePorts.filter(p => p.status === 'occupied').length;
+                const faultCount = devicePorts.filter(p => p.status === 'fault').length;
+                const isExpanded = expandedKeys.includes(deviceId);
 
-                  return (
-                    <motion.div
-                      key={deviceId}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.3, delay: index * 0.05 }}
-                    >
-                      <Panel
-                        header={
-                          <div
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              width: '100%',
-                              paddingRight: '16px',
-                            }}
-                          >
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                              <div
-                                style={{
-                                  width: '48px',
-                                  height: '48px',
-                                  borderRadius: designTokens.borderRadius.md,
-                                  background: designTokens.colors.primary.gradient,
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  color: '#fff',
-                                  fontSize: '24px',
-                                  boxShadow: designTokens.shadows.md,
-                                }}
-                              >
-                                {getDeviceIcon(device)}
-                              </div>
-                              <div>
-                                <div style={{ fontWeight: 600, fontSize: '16px', color: designTokens.colors.neutral[800] }}>
-                                  {device?.name || '未知设备'}
-                                </div>
-                                <div style={{ fontSize: '13px', color: designTokens.colors.neutral[500], marginTop: '2px' }}>
-                                  {device?.deviceId || '-'} · {device?.model || device?.type || '设备'}
-                                </div>
-                              </div>
-                            </div>
-                            <Space size="middle">
-                              <Tooltip title="空闲">
-                                <Tag 
-                                  color="success" 
-                                  style={{ borderRadius: '4px', padding: '4px 12px' }}
-                                  icon={<CheckCircleOutlined />}
-                                >
-                                  {freeCount}
-                                </Tag>
-                              </Tooltip>
-                              <Tooltip title="占用">
-                                <Tag 
-                                  color="processing" 
-                                  style={{ borderRadius: '4px', padding: '4px 12px' }}
-                                  icon={<AppstoreOutlined />}
-                                >
-                                  {occupiedCount}
-                                </Tag>
-                              </Tooltip>
-                              {faultCount > 0 && (
-                                <Tooltip title="故障">
-                                  <Tag 
-                                    color="error" 
-                                    style={{ borderRadius: '4px', padding: '4px 12px' }}
-                                    icon={<ExclamationCircleOutlined />}
-                                  >
-                                    {faultCount}
-                                  </Tag>
-                                </Tooltip>
-                              )}
-                              <Tag 
-                                color="blue" 
-                                style={{ borderRadius: '4px', padding: '4px 12px', fontWeight: 500 }}
-                              >
-                                总计: {devicePorts.length}
-                              </Tag>
-                            </Space>
-                          </div>
+                return (
+                  <Card
+                    key={deviceId}
+                    style={{
+                      borderRadius: designTokens.borderRadius.lg,
+                      border: `1px solid ${designTokens.colors.neutral[200]}`,
+                      overflow: 'hidden',
+                    }}
+                    bodyStyle={{ padding: 0 }}
+                  >
+                    {/* 设备头部 */}
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '16px 20px',
+                        background: isExpanded ? designTokens.colors.primary.light : '#fff',
+                        cursor: 'pointer',
+                        transition: 'background 0.2s',
+                      }}
+                      onClick={() => {
+                        if (isExpanded) {
+                          setExpandedKeys(prev => prev.filter(key => key !== deviceId));
+                        } else {
+                          setExpandedKeys(prev => [...prev, deviceId]);
                         }
-                        extra={
-                          <Space size="small" onClick={e => e.stopPropagation()}>
-                            <Tooltip title="添加端口">
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                        <div
+                          style={{
+                            width: '48px',
+                            height: '48px',
+                            borderRadius: designTokens.borderRadius.md,
+                            background: designTokens.colors.primary.gradient,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#fff',
+                            fontSize: '24px',
+                            boxShadow: designTokens.shadows.md,
+                          }}
+                        >
+                          {getDeviceIcon(device)}
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 600, fontSize: '16px', color: designTokens.colors.neutral[800] }}>
+                            {device?.name || '未知设备'}
+                          </div>
+                          <div style={{ fontSize: '13px', color: designTokens.colors.neutral[500], marginTop: '2px' }}>
+                            {device?.deviceId || '-'} · {device?.model || device?.type || '设备'}
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <Space size="small">
+                          <Tooltip title="空闲">
+                            <Tag color="success" style={{ borderRadius: '4px', padding: '4px 12px' }} icon={<CheckCircleOutlined />}>
+                              {freeCount}
+                            </Tag>
+                          </Tooltip>
+                          <Tooltip title="占用">
+                            <Tag color="processing" style={{ borderRadius: '4px', padding: '4px 12px' }} icon={<AppstoreOutlined />}>
+                              {occupiedCount}
+                            </Tag>
+                          </Tooltip>
+                          {faultCount > 0 && (
+                            <Tooltip title="故障">
+                              <Tag color="error" style={{ borderRadius: '4px', padding: '4px 12px' }} icon={<ExclamationCircleOutlined />}>
+                                {faultCount}
+                              </Tag>
+                            </Tooltip>
+                          )}
+                          <Tag color="blue" style={{ borderRadius: '4px', padding: '4px 12px', fontWeight: 500 }}>
+                            总计: {devicePorts.length}
+                          </Tag>
+                        </Space>
+                        <Divider type="vertical" style={{ height: '24px', margin: '0 8px' }} />
+                        <Space size="small">
+                          <Tooltip title="添加端口">
+                            <Button
+                              type="text"
+                              icon={<PlusOutlined />}
+                              onClick={e => {
+                                e.stopPropagation();
+                                handleAddPortForDevice(device);
+                              }}
+                              style={{ color: designTokens.colors.primary.main }}
+                            />
+                          </Tooltip>
+                          {device?.type?.toLowerCase()?.includes('server') && (
+                            <Tooltip title="网卡管理">
                               <Button
                                 type="text"
-                                icon={<PlusOutlined />}
-                                onClick={() => handleAddPortForDevice(device)}
+                                icon={<CloudServerOutlined />}
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  handleManageNetworkCards(device);
+                                }}
                                 style={{ color: designTokens.colors.primary.main }}
                               />
                             </Tooltip>
-                            {device?.type?.toLowerCase()?.includes('server') && (
-                              <Tooltip title="网卡管理">
-                                <Button
-                                  type="text"
-                                  icon={<CloudServerOutlined />}
-                                  onClick={() => handleManageNetworkCards(device)}
-                                  style={{ color: designTokens.colors.primary.main }}
-                                />
-                              </Tooltip>
-                            )}
-                          </Space>
-                        }
-                        style={{
-                          background: '#fff',
-                          borderRadius: designTokens.borderRadius.lg,
-                          marginBottom: '12px',
-                          border: `1px solid ${designTokens.colors.neutral[200]}`,
-                          overflow: 'hidden',
-                        }}
-                      >
-                        <motion.div
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          transition={{ duration: 0.2 }}
-                        >
+                          )}
+                          <Button
+                            type="text"
+                            size="small"
+                            icon={isExpanded ? <UpOutlined /> : <DownOutlined />}
+                            style={{ color: designTokens.colors.neutral[600], minWidth: '70px' }}
+                          >
+                            {isExpanded ? '收起' : '展开'}
+                          </Button>
+                        </Space>
+                      </div>
+                    </div>
+
+                    {/* 端口列表 */}
+                    {isExpanded && (
+                      <div style={{ padding: '16px 20px', borderTop: `1px solid ${designTokens.colors.neutral[200]}` }}>
+                        {devicePorts.length > 0 ? (
                           <Table
                             columns={portColumns}
                             dataSource={devicePorts}
@@ -1116,18 +1116,16 @@ function PortManagement() {
                             }}
                             size="middle"
                             scroll={{ x: 1000 }}
-                            style={{ 
-                              borderRadius: designTokens.borderRadius.md,
-                              overflow: 'hidden',
-                            }}
                           />
-                        </motion.div>
-                      </Panel>
-                    </motion.div>
-                  );
-                })}
-              </AnimatePresence>
-            </Collapse>
+                        ) : (
+                          <Empty description="暂无端口数据" style={{ padding: '24px 0' }} />
+                        )}
+                      </div>
+                    )}
+                  </Card>
+                );
+              })}
+            </div>
           )}
         </Card>
       </motion.div>

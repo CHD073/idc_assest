@@ -225,11 +225,15 @@ function ensureBackupDir(backupPath) {
   }
 }
 
-async function collectAllData() {
+async function collectAllData(tableNames = null) {
   const data = {};
   let totalRecords = 0;
 
-  for (const config of BACKUP_MODELS_CONFIG) {
+  const configsToProcess = tableNames 
+    ? BACKUP_MODELS_CONFIG.filter(c => tableNames.includes(c.name))
+    : BACKUP_MODELS_CONFIG;
+
+  for (const config of configsToProcess) {
     try {
       const Model = require(config.modelPath);
       const records = await Model.findAll({ raw: true });
@@ -545,7 +549,10 @@ async function validateBackupFile(filePath, options = {}) {
     return { valid: false, error: '备份文件缺少版本信息' };
   }
 
-  if (!backupData.data) {
+  const isIncremental = backupData.backupType === 'incremental';
+  const dataToValidate = isIncremental ? backupData.fullData : backupData.data;
+
+  if (!dataToValidate && !isIncremental) {
     return { valid: false, error: '备份文件缺少数据内容' };
   }
 
@@ -559,22 +566,57 @@ async function validateBackupFile(filePath, options = {}) {
     }
   }
 
-  // 详细的表信息统计
   const tableDetails = {};
   let totalRecords = 0;
-  for (const tableName of Object.keys(backupData.data)) {
-    if (Array.isArray(backupData.data[tableName])) {
-      const recordCount = backupData.data[tableName].length;
-      tableDetails[tableName] = {
-        recordCount,
-        hasData: recordCount > 0,
-        displayName: TABLE_NAME_MAPPING[tableName] || tableName, // 使用中文显示名称
-      };
-      totalRecords += recordCount;
+
+  if (isIncremental) {
+    if (backupData.fullData) {
+      for (const tableName of Object.keys(backupData.fullData)) {
+        if (Array.isArray(backupData.fullData[tableName])) {
+          const recordCount = backupData.fullData[tableName].length;
+          tableDetails[tableName] = {
+            recordCount,
+            hasData: recordCount > 0,
+            displayName: TABLE_NAME_MAPPING[tableName] || tableName,
+            type: 'full',
+          };
+          totalRecords += recordCount;
+        }
+      }
+    }
+    if (backupData.incrementalData) {
+      for (const tableName of Object.keys(backupData.incrementalData)) {
+        const inc = backupData.incrementalData[tableName];
+        const newCount = inc.new?.length || 0;
+        const updatedCount = inc.updated?.length || 0;
+        if (newCount > 0 || updatedCount > 0) {
+          tableDetails[tableName] = {
+            ...tableDetails[tableName],
+            newCount,
+            updatedCount,
+            recordCount: (tableDetails[tableName]?.recordCount || 0) + newCount + updatedCount,
+            hasData: true,
+            displayName: TABLE_NAME_MAPPING[tableName] || tableName,
+            type: tableDetails[tableName] ? 'both' : 'incremental',
+          };
+          totalRecords += newCount + updatedCount;
+        }
+      }
+    }
+  } else {
+    for (const tableName of Object.keys(backupData.data)) {
+      if (Array.isArray(backupData.data[tableName])) {
+        const recordCount = backupData.data[tableName].length;
+        tableDetails[tableName] = {
+          recordCount,
+          hasData: recordCount > 0,
+          displayName: TABLE_NAME_MAPPING[tableName] || tableName,
+        };
+        totalRecords += recordCount;
+      }
     }
   }
 
-  // 文件详情
   const fileDetails = {
     avatars: backupData.files?.avatars?.length || 0,
     others: backupData.files?.others?.length || 0,
@@ -589,6 +631,19 @@ async function validateBackupFile(filePath, options = {}) {
     })) || [],
   };
 
+  const metadata = isIncremental ? {
+    tableCount: Object.keys(backupData.fullData || {}).length,
+    incrementalTableCount: Object.keys(backupData.incrementalData || {}).length,
+    totalRecords,
+    totalChangedRecords: backupData.metadata?.totalChangedRecords || totalRecords,
+    fileCount: fileDetails.total,
+    lastBackupTime: backupData.lastBackupTime,
+  } : {
+    tableCount: Object.keys(backupData.data).length,
+    totalRecords,
+    fileCount: fileDetails.total,
+  };
+
   return {
     valid: true,
     version: backupData.version,
@@ -597,12 +652,7 @@ async function validateBackupFile(filePath, options = {}) {
     description: backupData.description,
     compressed: backupData.compressed,
     systemInfo: backupData.systemInfo,
-    metadata: {
-      tableCount: Object.keys(backupData.data).length,
-      totalRecords,
-      fileCount: fileDetails.total,
-    },
-    // 详细信息
+    metadata,
     details: {
       tables: tableDetails,
       files: fileDetails,
@@ -623,8 +673,16 @@ async function restoreData(backupData, options = {}) {
     recordsRestored: 0,
     errors: [],
     skipped: [],
-    tableDetails: {}, // 每个表的详细恢复信息
+    tableDetails: {},
   };
+
+  const isIncremental = backupData.backupType === 'incremental';
+  const dataToRestore = isIncremental ? backupData.fullData : backupData.data;
+
+  if (!dataToRestore) {
+    results.errors.push({ error: '备份数据为空' });
+    return results;
+  }
 
   for (const tableName of RESTORE_ORDER) {
     if (skipTables.includes(tableName)) {
@@ -633,7 +691,7 @@ async function restoreData(backupData, options = {}) {
       continue;
     }
 
-    const tableData = backupData.data[tableName];
+    const tableData = dataToRestore[tableName];
     if (!tableData || !Array.isArray(tableData) || tableData.length === 0) {
       onProgress(tableName, 'empty');
       continue;
@@ -652,11 +710,9 @@ async function restoreData(backupData, options = {}) {
         await Model.destroy({ where: {}, truncate: true });
       }
 
-      // 预处理记录：修复 JSON 字段格式
       const processedRecords = tableData.map(record => {
         const processed = { ...record };
         
-        // 修复 Device 表的 customFields 字段
         if (tableName === 'Device' && processed.customFields !== undefined && processed.customFields !== null) {
           if (typeof processed.customFields === 'string') {
             try {
@@ -701,7 +757,6 @@ async function restoreData(backupData, options = {}) {
       results.tablesRestored++;
       results.recordsRestored += insertedCount;
       
-      // 记录每个表的详细信息
       results.tableDetails[tableName] = {
         recordCount: insertedCount,
         displayName: TABLE_NAME_MAPPING[tableName] || tableName,
@@ -712,6 +767,89 @@ async function restoreData(backupData, options = {}) {
     } catch (error) {
       results.errors.push({ table: tableName, error: error.message });
       onProgress(tableName, 'error', error.message);
+    }
+  }
+
+  if (isIncremental && backupData.incrementalData) {
+    console.log('\n恢复增量数据...');
+    const incrementalResults = await restoreIncrementalData(backupData.incrementalData, options);
+    results.tablesRestored += incrementalResults.tablesRestored;
+    results.recordsRestored += incrementalResults.recordsRestored;
+    results.errors.push(...incrementalResults.errors);
+    Object.assign(results.tableDetails, incrementalResults.tableDetails);
+  }
+
+  return results;
+}
+
+async function restoreIncrementalData(incrementalData, options = {}) {
+  const results = {
+    tablesRestored: 0,
+    recordsRestored: 0,
+    errors: [],
+    tableDetails: {},
+  };
+
+  for (const tableName of Object.keys(incrementalData)) {
+    const tableIncrement = incrementalData[tableName];
+    const config = BACKUP_MODELS_CONFIG.find(c => c.name === tableName);
+    
+    if (!config) {
+      results.errors.push({ table: tableName, error: '未找到模型配置' });
+      continue;
+    }
+
+    try {
+      const Model = require(config.modelPath);
+      let updatedCount = 0;
+
+      if (tableIncrement.new && tableIncrement.new.length > 0) {
+        for (const record of tableIncrement.new) {
+          try {
+            await Model.create(record, { validate: false, silent: true });
+            updatedCount++;
+          } catch (insertError) {
+            if (insertError.name === 'SequelizeUniqueConstraintError') {
+              await Model.upsert(record, { validate: false, silent: true });
+              updatedCount++;
+            } else {
+              results.errors.push({
+                table: tableName,
+                record: record[Object.keys(record)[0]],
+                error: `新增失败: ${insertError.message}`,
+              });
+            }
+          }
+        }
+      }
+
+      if (tableIncrement.updated && tableIncrement.updated.length > 0) {
+        for (const record of tableIncrement.updated) {
+          try {
+            await Model.upsert(record, { validate: false, silent: true });
+            updatedCount++;
+          } catch (updateError) {
+            results.errors.push({
+              table: tableName,
+              record: record[Object.keys(record)[0]],
+              error: `更新失败: ${updateError.message}`,
+            });
+          }
+        }
+      }
+
+      if (updatedCount > 0) {
+        results.tablesRestored++;
+        results.recordsRestored += updatedCount;
+        results.tableDetails[tableName] = {
+          recordCount: updatedCount,
+          displayName: TABLE_NAME_MAPPING[tableName] || tableName,
+          success: true,
+          isIncremental: true,
+        };
+      }
+    } catch (error) {
+      results.errors.push({ table: tableName, error: error.message });
     }
   }
 
@@ -855,7 +993,7 @@ function cleanOldBackups(options = {}) {
   const maxAgeMs = maxAgeDays * 24 * 60 * 60 * 1000;
   
   const files = fs.readdirSync(backupPath)
-    .filter(f => (f.startsWith('backup_') || f.startsWith('uploaded_')) && (f.endsWith('.json') || f.endsWith('.json.gz')))
+    .filter(f => (f.startsWith('backup_') || f.startsWith('uploaded_') || f.startsWith('incremental_')) && (f.endsWith('.json') || f.endsWith('.json.gz')))
     .map(f => {
       const filePath = path.join(backupPath, f);
       const stats = fs.statSync(filePath);
@@ -928,6 +1066,7 @@ module.exports = {
   getLastBackupTime,
   validateBackupFile,
   restoreData,
+  restoreIncrementalData,
   restoreFiles,
   restoreBackup,
   calculateChecksum,

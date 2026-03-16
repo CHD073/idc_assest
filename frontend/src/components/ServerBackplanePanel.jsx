@@ -12,7 +12,7 @@ import {
   SettingOutlined,
 } from '@ant-design/icons';
 import PortPanel from './PortPanel';
-import axios from 'axios';
+import api from '../api';
 import { designTokens } from '../config/theme';
 import CloseButton from './CloseButton';
 
@@ -47,8 +47,8 @@ const ServerBackplanePanel = ({
 
     try {
       setLoading(true);
-      const response = await axios.get(`/api/network-cards/device/${deviceId}/with-ports`);
-      const cardsData = response.data || [];
+      const response = await api.get(`/network-cards/device/${deviceId}/with-ports`);
+      const cardsData = response.data || response || [];
       setCards(cardsData);
     } catch (error) {
       console.error('获取网卡数据失败:', error);

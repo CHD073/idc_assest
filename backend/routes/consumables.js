@@ -223,12 +223,17 @@ router.get('/low-stock', async (req, res) => {
   try {
     const consumables = await Consumable.findAll({
       where: {
+        status: 'active',
         [Op.and]: [
           sequelize.where(sequelize.col('currentStock'), {
             [Op.lte]: sequelize.col('minStock')
+          }),
+          sequelize.where(sequelize.col('minStock'), {
+            [Op.gt]: 0
           })
         ]
-      }
+      },
+      order: [['currentStock', 'ASC']]
     });
     res.json(consumables);
   } catch (error) {
@@ -239,35 +244,41 @@ router.get('/low-stock', async (req, res) => {
 router.get('/statistics/summary', async (req, res) => {
   try {
     const consumables = await Consumable.findAll({
-      attributes: ['currentStock', 'unitPrice', 'category']
+      attributes: ['currentStock', 'unitPrice', 'category', 'minStock', 'status']
     });
 
-    let total = consumables.length;
+    let total = 0;
     let lowStock = 0;
     let totalValue = 0;
     const categoryMap = {};
 
     consumables.forEach(item => {
+      if (item.status === 'inactive') return;
+      
+      total++;
       const currentStock = parseFloat(item.currentStock) || 0;
       const unitPrice = parseFloat(item.unitPrice) || 0;
+      const minStockValue = parseFloat(item.minStock) || 0;
 
       totalValue += currentStock * unitPrice;
 
-      if (currentStock <= (parseFloat(item.minStock) || 0)) {
+      if (minStockValue > 0 && currentStock <= minStockValue) {
         lowStock++;
       }
 
       if (item.category) {
         if (!categoryMap[item.category]) {
-          categoryMap[item.category] = 0;
+          categoryMap[item.category] = { count: 0, totalQuantity: 0 };
         }
-        categoryMap[item.category]++;
+        categoryMap[item.category].count++;
+        categoryMap[item.category].totalQuantity += currentStock;
       }
     });
 
-    const byCategory = Object.entries(categoryMap).map(([category, count]) => ({
+    const byCategory = Object.entries(categoryMap).map(([category, data]) => ({
       category,
-      count
+      count: data.count,
+      totalQuantity: data.totalQuantity
     }));
 
     res.json({
@@ -292,7 +303,7 @@ router.get('/inout/records', async (req, res) => {
       order: [['createdAt', 'DESC']],
       include: [{
         model: Consumable,
-        as: 'Consumable',
+        as: 'consumable',
         attributes: ['consumableId', 'name', 'category']
       }]
     });

@@ -23,6 +23,11 @@ const {
   executeBackupNow,
 } = require('../utils/autoBackupScheduler');
 const {
+  getBackupLogs,
+  getBackupLogById,
+  deleteOldLogs,
+} = require('../utils/backupLog');
+const {
   getAllTargets,
   getTarget,
   addTarget,
@@ -30,6 +35,7 @@ const {
   deleteTarget,
   getGlobalSettings,
   updateGlobalSettings,
+  getEnabledTargets,
 } = require('../utils/remoteBackupConfig');
 const { testRemoteConnection, PROTOCOL_TYPES, PROTOCOL_LABELS } = require('../utils/remoteBackup');
 
@@ -446,6 +452,7 @@ router.post('/auto/settings', (req, res) => {
       compress,
       maxCount,
       maxAgeDays,
+      backupType,
     } = req.body;
 
     const newSettings = {};
@@ -468,6 +475,7 @@ router.post('/auto/settings', (req, res) => {
     if (compress !== undefined) newSettings.compress = compress;
     if (maxCount !== undefined) newSettings.maxCount = maxCount;
     if (maxAgeDays !== undefined) newSettings.maxAgeDays = maxAgeDays;
+    if (backupType !== undefined) newSettings.backupType = backupType;
 
     const success = updateAutoBackupSettings(newSettings);
     if (success) {
@@ -496,12 +504,13 @@ router.post('/auto/settings', (req, res) => {
 // 立即执行备份
 router.post('/auto/execute', async (req, res) => {
   try {
-    const { description, includeFiles, compress } = req.body;
+    const { description, includeFiles, compress, backupType } = req.body;
     
     const result = await executeBackupNow({
       description: description || '手动触发备份',
       includeFiles,
       compress,
+      backupType,
     });
 
     if (result.success) {
@@ -849,6 +858,82 @@ router.post('/remote/upload', async (req, res) => {
     res.status(500).json({
       success: false,
       message: '手动上传备份失败',
+      error: error.message,
+    });
+  }
+});
+
+// ==================== 备份日志接口 ====================
+
+// 获取备份日志列表
+router.get('/logs', async (req, res) => {
+  try {
+    const { page = 1, pageSize = 20, logType, status } = req.query;
+    
+    const result = await getBackupLogs({
+      page: parseInt(page),
+      pageSize: parseInt(pageSize),
+      logType,
+      status,
+    });
+    
+    res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    console.error('获取备份日志失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '获取备份日志失败',
+      error: error.message,
+    });
+  }
+});
+
+// 获取备份日志详情
+router.get('/logs/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const log = await getBackupLogById(parseInt(id));
+    
+    if (!log) {
+      return res.status(404).json({
+        success: false,
+        message: '备份日志不存在',
+      });
+    }
+    
+    res.json({
+      success: true,
+      data: log,
+    });
+  } catch (error) {
+    console.error('获取备份日志详情失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '获取备份日志详情失败',
+      error: error.message,
+    });
+  }
+});
+
+// 清理旧日志
+router.delete('/logs/clean', async (req, res) => {
+  try {
+    const { days = 30 } = req.body;
+    const deletedCount = await deleteOldLogs(parseInt(days));
+    
+    res.json({
+      success: true,
+      message: '清理完成',
+      data: { deletedCount },
+    });
+  } catch (error) {
+    console.error('清理旧日志失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '清理旧日志失败',
       error: error.message,
     });
   }
