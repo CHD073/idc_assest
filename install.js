@@ -828,7 +828,7 @@ async function checkEnvironment() {
  * 
  * 交互流程：
  *   1. 选择数据库类型（SQLite / MySQL）
- *   2. 如选择 MySQL，提示输入连接参数
+ *   2. 如选择 MySQL，提示输入连接参数或自动安装
  */
 async function configureDatabase(cmdArgs) {
   log.step('数据库配置');
@@ -847,9 +847,6 @@ async function configureDatabase(cmdArgs) {
   }
 
   if (config.dbType === 'mysql') {
-    console.log('\n' + colors.yellow + '请确保MySQL服务已启动并创建了数据库' + colors.reset);
-    console.log(colors.gray + '创建数据库命令: CREATE DATABASE idc_management CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;' + colors.reset + '\n');
-
     if (cmdArgs?.nonInteractive) {
       config.dbConfig.host = process.env.MYSQL_HOST || 'localhost';
       config.dbConfig.port = process.env.MYSQL_PORT || '3306';
@@ -858,25 +855,208 @@ async function configureDatabase(cmdArgs) {
       config.dbConfig.database = process.env.MYSQL_DATABASE || 'idc_management';
       log.info(`MySQL 配置: ${config.dbConfig.host}:${config.dbConfig.port}/${config.dbConfig.database}`);
     } else {
-      config.dbConfig.host = await ask('MySQL 主机地址', 'localhost');
-      config.dbConfig.port = await ask('MySQL 端口', '3306');
-      config.dbConfig.username = await ask('MySQL 用户名', 'root');
-      config.dbConfig.password = await askPassword('MySQL 密码');
-      config.dbConfig.database = await ask('数据库名称', 'idc_management');
+      const mysqlOption = await select('MySQL 配置方式：', [
+        { label: '已有数据库（填写现有 MySQL 连接信息）', value: 'existing' },
+        { label: '自动安装 MySQL（Linux 系统支持自动安装配置）', value: 'install' }
+      ]);
+
+      if (mysqlOption === 'install') {
+        const installResult = await installMySQL();
+        if (installResult.success) {
+          config.dbConfig = { ...installResult.config };
+        } else {
+          log.error('MySQL 自动安装失败');
+          const fallback = await ask('是否改为手动配置现有 MySQL? (Y/n)', 'Y');
+          if (fallback.toLowerCase() === 'y') {
+            await configureExistingMySQL();
+          } else {
+            log.info('已取消 MySQL 配置，将使用 SQLite');
+            config.dbType = 'sqlite';
+          }
+        }
+      } else {
+        await configureExistingMySQL();
+      }
     }
 
-    const testResult = await testMySQLConnection();
-    if (!testResult.success) {
-      log.error(`MySQL 连接测试失败: ${testResult.error}`);
-      const retry = cmdArgs?.nonInteractive ? false : await ask('是否重新配置? (Y/n)', 'Y');
-      if (retry.toLowerCase() === 'y') {
-        return await configureDatabase(cmdArgs);
+    if (config.dbType === 'mysql') {
+      const testResult = await testMySQLConnection();
+      if (!testResult.success) {
+        log.error(`MySQL 连接测试失败: ${testResult.error}`);
+        const retry = cmdArgs?.nonInteractive ? false : await ask('是否重新配置? (Y/n)', 'Y');
+        if (retry.toLowerCase() === 'y') {
+          return await configureDatabase(cmdArgs);
+        }
+        log.warning('将继续部署，但数据库可能无法正常工作');
       }
-      log.warning('将继续部署，但数据库可能无法正常工作');
     }
   }
 
   log.divider();
+}
+
+async function configureExistingMySQL() {
+  console.log('\n' + colors.yellow + '请确保 MySQL 服务已启动并创建了数据库' + colors.reset);
+  console.log(colors.gray + '创建数据库命令: CREATE DATABASE idc_management CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;' + colors.reset + '\n');
+
+  config.dbConfig.host = await ask('MySQL 主机地址', 'localhost');
+  config.dbConfig.port = await ask('MySQL 端口', '3306');
+  config.dbConfig.username = await ask('MySQL 用户名', 'root');
+  config.dbConfig.password = await askPassword('MySQL 密码');
+  config.dbConfig.database = await ask('数据库名称', 'idc_management');
+}
+
+async function installMySQL() {
+  log.subStep('检测系统环境...');
+  
+  const platform = process.platform;
+  
+  if (platform === 'win32') {
+    log.warning('Windows 系统暂不支持自动安装 MySQL');
+    console.log('\n' + colors.cyan + '请手动安装 MySQL：' + colors.reset);
+    console.log('  1. 下载 MySQL: https://dev.mysql.com/downloads/mysql/');
+    console.log('  2. 或使用 XAMPP/WAMP 等集成环境');
+    console.log('  3. 安装后创建数据库:');
+    console.log(colors.gray + '     CREATE DATABASE idc_management CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;' + colors.reset);
+    return { success: false };
+  }
+
+  if (platform !== 'linux') {
+    log.warning('当前系统暂不支持自动安装 MySQL');
+    return { success: false };
+  }
+
+  const distro = detectLinuxDistro();
+  log.info(`检测到 Linux 发行版: ${distro}`);
+
+  const mysqlRootPassword = await askPassword('设置 MySQL root 密码（用于新安装的 MySQL）');
+  if (!mysqlRootPassword) {
+    log.error('密码不能为空');
+    return { success: false };
+  }
+
+  log.subStep('开始安装 MySQL...');
+
+  try {
+    switch (distro) {
+      case 'ubuntu':
+      case 'debian':
+        await installMySQLDebian(mysqlRootPassword);
+        break;
+      case 'centos':
+      case 'rhel':
+      case 'rocky':
+      case 'almalinux':
+        await installMySQLRHEL(mysqlRootPassword);
+        break;
+      default:
+        log.warning(`暂不支持 ${distro} 自动安装 MySQL`);
+        return { success: false };
+    }
+
+    config.dbConfig.host = 'localhost';
+    config.dbConfig.port = '3306';
+    config.dbConfig.username = 'root';
+    config.dbConfig.password = mysqlRootPassword;
+    config.dbConfig.database = 'idc_management';
+
+    log.subStep('创建数据库...');
+    await createMySQLDatabase(mysqlRootPassword);
+
+    log.success('MySQL 安装配置完成');
+    return { 
+      success: true, 
+      config: {
+        host: 'localhost',
+        port: '3306',
+        username: 'root',
+        password: mysqlRootPassword,
+        database: 'idc_management'
+      }
+    };
+  } catch (error) {
+    log.error(`MySQL 安装失败: ${error.message}`);
+    return { success: false, error: error.message };
+  }
+}
+
+function detectLinuxDistro() {
+  try {
+    if (fs.existsSync('/etc/os-release')) {
+      const content = fs.readFileSync('/etc/os-release', 'utf8');
+      const idMatch = content.match(/^ID=(.*)$/m);
+      if (idMatch) {
+        const id = idMatch[1].replace(/"/g, '').toLowerCase();
+        if (['ubuntu', 'debian'].includes(id)) return 'ubuntu';
+        if (['centos', 'rhel', 'rocky', 'almalinux', 'fedora'].includes(id)) return 'centos';
+        return id;
+      }
+    }
+    if (fs.existsSync('/etc/redhat-release')) return 'centos';
+    if (fs.existsSync('/etc/debian_version')) return 'ubuntu';
+  } catch {}
+  return 'unknown';
+}
+
+async function installMySQLDebian(rootPassword) {
+  log.info('安装 MySQL (Ubuntu/Debian)...');
+  
+  execSync('export DEBIAN_FRONTEND=noninteractive', { shell: '/bin/bash' });
+  
+  execSync('apt-get update -qq', { shell: '/bin/bash', stdio: 'inherit' });
+  
+  execSync(`debconf-set-selections <<< "mysql-server mysql-server/root_password password ${rootPassword}"`, { shell: '/bin/bash' });
+  execSync(`debconf-set-selections <<< "mysql-server mysql-server/root_password_again password ${rootPassword}"`, { shell: '/bin/bash' });
+  
+  execSync('apt-get install -y -qq mysql-server', { shell: '/bin/bash', stdio: 'inherit' });
+  
+  execSync('systemctl start mysql', { shell: '/bin/bash' });
+  execSync('systemctl enable mysql', { shell: '/bin/bash' });
+  
+  log.success('MySQL 安装完成');
+}
+
+async function installMySQLRHEL(rootPassword) {
+  log.info('安装 MySQL (CentOS/RHEL)...');
+  
+  execSync('yum install -y -q epel-release', { shell: '/bin/bash', stdio: 'inherit' });
+  execSync('yum install -y -q mysql-server', { shell: '/bin/bash', stdio: 'inherit' });
+  
+  execSync('systemctl start mysqld', { shell: '/bin/bash' });
+  execSync('systemctl enable mysqld', { shell: '/bin/bash' });
+  
+  try {
+    execSync(`mysqladmin -u root password "${rootPassword}"`, { shell: '/bin/bash' });
+  } catch {
+    log.info('root 密码可能已设置，跳过');
+  }
+  
+  log.success('MySQL 安装完成');
+}
+
+async function createMySQLDatabase(rootPassword) {
+  const mysql = require('mysql2/promise');
+  
+  try {
+    const connection = await mysql.createConnection({
+      host: 'localhost',
+      port: 3306,
+      user: 'root',
+      password: rootPassword
+    });
+    
+    await connection.execute(
+      'CREATE DATABASE IF NOT EXISTS idc_management CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
+    );
+    
+    await connection.end();
+    log.success('数据库 idc_management 创建成功');
+  } catch (error) {
+    log.warning(`数据库创建失败: ${error.message}`);
+    log.info('请手动创建数据库:');
+    console.log(colors.cyan + '  mysql -u root -p' + colors.reset);
+    console.log(colors.cyan + '  CREATE DATABASE idc_management CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;' + colors.reset);
+  }
 }
 
 async function testMySQLConnection() {
