@@ -1035,24 +1035,35 @@ async function installMySQLRHEL(rootPassword) {
 }
 
 async function createMySQLDatabase(rootPassword) {
-  const mysql = require('mysql2/promise');
+  log.subStep('创建数据库...');
+  
+  const createDbSql = 'CREATE DATABASE IF NOT EXISTS idc_management CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;';
   
   try {
-    const connection = await mysql.createConnection({
-      host: 'localhost',
-      port: 3306,
-      user: 'root',
-      password: rootPassword
+    execSync(`mysql -u root -p'${rootPassword}' -e "${createDbSql}"`, {
+      shell: '/bin/bash',
+      stdio: ['pipe', 'pipe', 'pipe']
     });
-    
-    await connection.execute(
-      'CREATE DATABASE IF NOT EXISTS idc_management CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci'
-    );
-    
-    await connection.end();
     log.success('数据库 idc_management 创建成功');
+    return;
   } catch (error) {
-    log.warning(`数据库创建失败: ${error.message}`);
+    const errorMsg = error.stderr ? error.stderr.toString() : error.message;
+    
+    if (errorMsg.includes('Access denied') || errorMsg.includes('ERROR 1045')) {
+      log.warning('MySQL root 密码验证失败，尝试无密码连接...');
+      try {
+        execSync(`mysql -u root -e "${createDbSql}"`, {
+          shell: '/bin/bash',
+          stdio: ['pipe', 'pipe', 'pipe']
+        });
+        log.success('数据库 idc_management 创建成功');
+        return;
+      } catch (e2) {
+        log.warning(`无密码连接也失败: ${e2.message}`);
+      }
+    }
+    
+    log.warning(`数据库自动创建失败: ${errorMsg.trim()}`);
     log.info('请手动创建数据库:');
     console.log(colors.cyan + '  mysql -u root -p' + colors.reset);
     console.log(colors.cyan + '  CREATE DATABASE idc_management CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;' + colors.reset);
