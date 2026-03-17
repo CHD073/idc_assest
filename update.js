@@ -429,6 +429,70 @@ function runMigrations(options) {
   return { success: true, warning: true };
 }
 
+function checkFrontendNeedsBuild() {
+  const frontendPath = path.join(__dirname, 'frontend');
+  const distPath = path.join(frontendPath, 'dist');
+  const srcPath = path.join(frontendPath, 'src');
+
+  if (!fs.existsSync(distPath)) {
+    return { needBuild: true, reason: 'dist 目录不存在' };
+  }
+
+  try {
+    const gitDiff = execSync('git diff HEAD~1 --name-only -- "frontend/src" "frontend/package.json" "frontend/vite.config.*" "frontend/index.html" 2>nul', {
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'pipe'],
+      cwd: __dirname
+    }).trim();
+
+    if (gitDiff) {
+      const changedFiles = gitDiff.split('\n').filter(f => f).slice(0, 3);
+      return { 
+        needBuild: true, 
+        reason: `源码或配置有更新: ${changedFiles.join(', ')}${gitDiff.split('\n').length > 3 ? '...' : ''}`
+      };
+    }
+  } catch {
+    // Git 检查失败，继续其他检测
+  }
+
+  try {
+    let latestSrcTime = 0;
+    let latestDistTime = 0;
+
+    const getLatestTime = (dir) => {
+      let latest = 0;
+      const files = fs.readdirSync(dir);
+      for (const file of files) {
+        const filePath = path.join(dir, file);
+        const stat = fs.statSync(filePath);
+        if (stat.isDirectory()) {
+          latest = Math.max(latest, getLatestTime(filePath));
+        } else {
+          latest = Math.max(latest, stat.mtimeMs);
+        }
+      }
+      return latest;
+    };
+
+    if (fs.existsSync(srcPath)) {
+      latestSrcTime = getLatestTime(srcPath);
+    }
+    if (fs.existsSync(distPath)) {
+      latestDistTime = getLatestTime(distPath);
+    }
+
+    if (latestSrcTime > latestDistTime) {
+      return { needBuild: true, reason: '源码修改时间晚于构建产物' };
+    }
+  } catch {
+    // 时间检测失败，保守起见执行构建
+    return { needBuild: true, reason: '构建状态检测失败' };
+  }
+
+  return { needBuild: false, reason: '构建产物已是最新' };
+}
+
 function buildFrontend(options) {
   if (options.skipBuild) {
     log.info('已跳过前端构建');
@@ -438,20 +502,28 @@ function buildFrontend(options) {
   const frontendPath = path.join(__dirname, 'frontend');
 
   if (options.dryRun) {
-    log.subStep('[模拟] 构建前端');
+    log.subStep('[模拟] 检测前端构建状态');
     return { success: true, dryRun: true };
   }
 
-  log.subStep('构建前端...');
-  const buildResult = runCommand('npm run build', { cwd: frontendPath });
+  log.subStep('检测前端构建状态...');
+  const buildCheck = checkFrontendNeedsBuild();
   
-  if (buildResult.success) {
-    log.success('前端构建完成');
-    return { success: true };
+  if (buildCheck.needBuild) {
+    log.info(`前端需要构建: ${buildCheck.reason}`);
+    const buildResult = runCommand('npm run build', { cwd: frontendPath });
+    
+    if (buildResult.success) {
+      log.success('前端构建完成');
+      return { success: true };
+    }
+
+    log.error('前端构建失败');
+    return { success: false };
   }
 
-  log.error('前端构建失败');
-  return { success: false };
+  log.success(`前端构建产物已是最新 (${buildCheck.reason})`);
+  return { success: true, skipped: true };
 }
 
 function restartServices(options) {
