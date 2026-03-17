@@ -40,6 +40,7 @@ import {
   PlusOutlined,
   ClearOutlined,
   EyeOutlined,
+  TableOutlined,
 } from '@ant-design/icons';
 import api, { backupAPI } from '../api';
 import CloseButton from '../components/CloseButton';
@@ -542,290 +543,388 @@ const BackupManagement = () => {
   const handleRestore = async (filename) => {
     setRestoreLoading(true);
     setRestoreProgress(0);
-    setRestoreStatus('正在验证备份文件...');
+    setRestoreStatus('正在初始化...');
 
-    try {
-      setRestoreProgress(10);
-      setRestoreStatus('正在读取备份数据...');
+    const token = localStorage.getItem('token');
+    const options = {
+      overwriteExisting: true,
+      skipFiles: false,
+    };
+    
+    const eventSource = new EventSource(
+      `/api/backup/restore-progress/${encodeURIComponent(filename)}?token=${encodeURIComponent(token)}&options=${encodeURIComponent(JSON.stringify(options))}`
+    );
 
-      const response = await api.post('/backup/restore', {
-        filename,
-        options: {
-          overwriteExisting: true,
-          skipFiles: false,
-        },
-      });
+    let resultData = null;
 
-      setRestoreProgress(90);
-      setRestoreStatus('正在完成恢复...');
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        
+        setRestoreProgress(data.progress);
+        setRestoreStatus(data.message);
 
-      if (response?.success) {
-        const data = response.data;
-        setRestoreProgress(100);
-        setRestoreStatus('恢复完成!');
+        if (data.stage === 'complete') {
+          resultData = data.result;
+          eventSource.close();
+          
+          setTimeout(() => {
+            setRestoreVisible(false);
+            setRestoreLoading(false);
+            
+            const successIconStyle = {
+              width: 56,
+              height: 56,
+              borderRadius: '16px',
+              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 8px 24px rgba(16, 185, 129, 0.3)',
+              animation: 'successPop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+            };
 
-        setTimeout(() => {
-          setRestoreVisible(false);
-          setRestoreLoading(false);
-          Modal.success({
-            title: (
-              <Space>
-                <div style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: '12px',
-                  background: 'linear-gradient(135deg, #10b981 0%, #34d399 100%)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}>
-                  <CheckCircleOutlined style={{ color: '#fff', fontSize: 24 }} />
-                </div>
-                <span style={{ fontSize: '20px', fontWeight: 700 }}>数据恢复成功</span>
-              </Space>
-            ),
-            width: 700,
-            content: (
-              <div style={{ marginTop: 16 }}>
-                {/* 汇总信息 */}
-                <div style={{ 
-                  padding: '16px', 
-                  background: designTokens.colors.primary.main + '08',
-                  borderRadius: designTokens.borderRadius.md,
-                  border: `1px solid ${designTokens.colors.primary.main}20`,
-                  marginBottom: 16,
-                }}>
-                  <Row gutter={[16, 16]}>
-                    <Col span={6}>
-                      <div style={{ textAlign: 'center' }}>
-                        <p style={{ 
-                          margin: 0, 
-                          fontSize: '24px', 
-                          fontWeight: 700,
-                          background: designTokens.colors.primary.gradient,
-                          WebkitBackgroundClip: 'text',
-                          WebkitTextFillColor: 'transparent',
-                          backgroundClip: 'text',
-                        }}>
-                          {data.tablesRestored}
-                        </p>
-                        <p style={{ 
-                          margin: '4px 0 0 0', 
-                          fontSize: 12, 
-                          color: designTokens.colors.text.muted 
-                        }}>
-                          恢复表数
-                        </p>
-                      </div>
-                    </Col>
-                    <Col span={6}>
-                      <div style={{ textAlign: 'center' }}>
-                        <p style={{ 
-                          margin: 0, 
-                          fontSize: '24px', 
-                          fontWeight: 700,
-                          background: designTokens.colors.success.gradient,
-                          WebkitBackgroundClip: 'text',
-                          WebkitTextFillColor: 'transparent',
-                          backgroundClip: 'text',
-                        }}>
-                          {data.recordsRestored}
-                        </p>
-                        <p style={{ 
-                          margin: '4px 0 0 0', 
-                          fontSize: 12, 
-                          color: designTokens.colors.text.muted 
-                        }}>
-                          恢复记录
-                        </p>
-                      </div>
-                    </Col>
-                    <Col span={6}>
-                      <div style={{ textAlign: 'center' }}>
-                        <p style={{ 
-                          margin: 0, 
-                          fontSize: '24px', 
-                          fontWeight: 700,
-                          background: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)',
-                          WebkitBackgroundClip: 'text',
-                          WebkitTextFillColor: 'transparent',
-                          backgroundClip: 'text',
-                        }}>
-                          {data.filesRestored}
-                        </p>
-                        <p style={{ 
-                          margin: '4px 0 0 0', 
-                          fontSize: 12, 
-                          color: designTokens.colors.text.muted 
-                        }}>
-                          恢复文件
-                        </p>
-                      </div>
-                    </Col>
-                    <Col span={6}>
-                      <div style={{ textAlign: 'center' }}>
-                        <p style={{ 
-                          margin: 0, 
-                          fontSize: '24px', 
-                          fontWeight: 700,
-                          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                          WebkitBackgroundClip: 'text',
-                          WebkitTextFillColor: 'transparent',
-                          backgroundClip: 'text',
-                        }}>
-                          {formatDateTime(data.restoredAt)}
-                        </p>
-                        <p style={{ 
-                          margin: '4px 0 0 0', 
-                          fontSize: 12, 
-                          color: designTokens.colors.text.muted 
-                        }}>
-                          恢复时间
-                        </p>
-                      </div>
-                    </Col>
-                  </Row>
-                </div>
+            const statCardStyle = (gradient, shadowColor) => ({
+              background: gradient,
+              borderRadius: '16px',
+              padding: '20px 16px',
+              textAlign: 'center',
+              boxShadow: `0 4px 16px ${shadowColor}`,
+              transition: 'transform 0.3s ease, box-shadow 0.3s ease',
+              cursor: 'default',
+              position: 'relative',
+              overflow: 'hidden',
+            });
 
-                {/* 数据表恢复详情 */}
-                {data.tableDetails && Object.keys(data.tableDetails).length > 0 && (
+            const statValueStyle = {
+              margin: 0,
+              fontSize: '32px',
+              fontWeight: 700,
+              color: '#ffffff',
+              lineHeight: 1.2,
+              textShadow: '0 2px 4px rgba(0,0,0,0.1)',
+            };
+
+            const statLabelStyle = {
+              margin: '8px 0 0 0',
+              fontSize: '13px',
+              fontWeight: 500,
+              color: 'rgba(255,255,255,0.9)',
+              letterSpacing: '0.5px',
+            };
+
+            const tableCardStyle = {
+              padding: '12px 16px',
+              background: 'linear-gradient(135deg, #ffffff 0%, #f8fafc 100%)',
+              borderRadius: '12px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              border: '1px solid #e2e8f0',
+              transition: 'all 0.25s ease',
+              cursor: 'default',
+            };
+
+            Modal.success({
+              icon: null,
+              title: null,
+              width: 720,
+              content: (
+                <div style={{ marginTop: 8 }}>
+                  <style>{`
+                    @keyframes successPop {
+                      0% { transform: scale(0); opacity: 0; }
+                      50% { transform: scale(1.1); }
+                      100% { transform: scale(1); opacity: 1; }
+                    }
+                    @keyframes slideUp {
+                      from { transform: translateY(20px); opacity: 0; }
+                      to { transform: translateY(0); opacity: 1; }
+                    }
+                    @keyframes shimmer {
+                      0% { background-position: -200% 0; }
+                      100% { background-position: 200% 0; }
+                    }
+                    .stat-card:hover {
+                      transform: translateY(-4px) scale(1.02);
+                    }
+                    .table-card:hover {
+                      border-color: #6366f1;
+                      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.15);
+                      transform: translateX(4px);
+                    }
+                    .success-badge {
+                      background: linear-gradient(90deg, #10b981, #059669, #10b981);
+                      background-size: 200% 100%;
+                      animation: shimmer 2s infinite linear;
+                    }
+                  `}</style>
+                  
                   <div style={{ 
-                    padding: '16px', 
-                    background: designTokens.colors.background.accent,
-                    borderRadius: designTokens.borderRadius.md,
-                    marginBottom: 16,
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    alignItems: 'center',
+                    marginBottom: 24,
+                    animation: 'slideUp 0.5s ease forwards',
                   }}>
-                    <p style={{ 
-                      margin: '0 0 12px 0', 
-                      fontWeight: 600, 
-                      color: designTokens.colors.text.primary,
-                      display: 'flex',
+                    <div style={successIconStyle}>
+                      <CheckCircleOutlined style={{ color: '#fff', fontSize: 28 }} />
+                    </div>
+                    <h2 style={{ 
+                      margin: '16px 0 4px 0', 
+                      fontSize: '24px', 
+                      fontWeight: 700,
+                      color: '#1e293b',
+                    }}>
+                      数据恢复成功
+                    </h2>
+                    <div style={{
+                      display: 'inline-flex',
                       alignItems: 'center',
+                      gap: 6,
+                      padding: '4px 12px',
+                      borderRadius: '20px',
+                      background: '#ecfdf5',
+                      border: '1px solid #a7f3d0',
                     }}>
-                      <DatabaseOutlined style={{ marginRight: 8 }} />
-                      数据表恢复详情
-                    </p>
-                    <div style={{ 
-                      display: 'grid', 
-                      gridTemplateColumns: 'repeat(2, 1fr)', 
-                      gap: '8px',
-                      maxHeight: '300px',
-                      overflowY: 'auto',
-                      padding: '8px',
-                      background: designTokens.colors.background.secondary,
-                      borderRadius: designTokens.borderRadius.sm,
-                    }}>
-                      {Object.entries(data.tableDetails).map(([tableName, tableInfo]) => (
-                        <div 
-                          key={tableName}
-                          style={{
-                            padding: '10px 12px',
-                            background: designTokens.colors.background.secondary,
-                            borderRadius: designTokens.borderRadius.sm,
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            border: `1px solid ${designTokens.colors.text.muted}10`,
-                          }}
-                        >
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                            <span style={{ 
-                              fontWeight: 600, 
-                              color: designTokens.colors.text.primary,
-                              fontSize: 14,
-                            }}>
-                              {tableInfo.displayName || tableName}
-                            </span>
-                            {tableInfo.displayName !== tableName && (
-                              <span style={{ 
-                                fontSize: 11, 
-                                color: designTokens.colors.text.muted,
-                              }}>
-                                {tableName}
-                              </span>
-                            )}
-                          </div>
-                          <Tag color={tableInfo.success ? 'green' : 'default'} style={{ borderRadius: '4px' }}>
-                            {tableInfo.recordCount} 条
-                          </Tag>
-                        </div>
-                      ))}
+                      <span style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: '50%',
+                        background: '#10b981',
+                      }} />
+                      <span style={{ fontSize: 12, color: '#059669', fontWeight: 500 }}>
+                        所有数据已安全恢复
+                      </span>
                     </div>
                   </div>
-                )}
 
-                {/* 文件恢复详情 */}
-                {data.fileDetails && (data.fileDetails.avatars > 0 || data.fileDetails.others > 0) && (
                   <div style={{ 
-                    padding: '16px', 
-                    background: designTokens.colors.background.accent,
-                    borderRadius: designTokens.borderRadius.md,
-                    marginBottom: 16,
+                    display: 'grid', 
+                    gridTemplateColumns: 'repeat(4, 1fr)', 
+                    gap: 12,
+                    marginBottom: 20,
+                    animation: 'slideUp 0.5s ease 0.1s forwards',
+                    opacity: 0,
                   }}>
-                    <p style={{ 
-                      margin: '0 0 12px 0', 
-                      fontWeight: 600, 
-                      color: designTokens.colors.text.primary,
+                    <div className="stat-card" style={statCardStyle(
+                      'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                      'rgba(99, 102, 241, 0.25)'
+                    )}>
+                      <DatabaseOutlined style={{ fontSize: 20, color: 'rgba(255,255,255,0.8)', marginBottom: 8 }} />
+                      <p style={statValueStyle}>{resultData?.tablesRestored || 0}</p>
+                      <p style={statLabelStyle}>恢复表数</p>
+                    </div>
+                    
+                    <div className="stat-card" style={statCardStyle(
+                      'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                      'rgba(16, 185, 129, 0.25)'
+                    )}>
+                      <TableOutlined style={{ fontSize: 20, color: 'rgba(255,255,255,0.8)', marginBottom: 8 }} />
+                      <p style={statValueStyle}>{resultData?.recordsRestored || 0}</p>
+                      <p style={statLabelStyle}>恢复记录</p>
+                    </div>
+                    
+                    <div className="stat-card" style={statCardStyle(
+                      'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                      'rgba(245, 158, 11, 0.25)'
+                    )}>
+                      <FileTextOutlined style={{ fontSize: 20, color: 'rgba(255,255,255,0.8)', marginBottom: 8 }} />
+                      <p style={statValueStyle}>{resultData?.filesRestored || 0}</p>
+                      <p style={statLabelStyle}>恢复文件</p>
+                    </div>
+                    
+                    <div className="stat-card" style={statCardStyle(
+                      'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+                      'rgba(139, 92, 246, 0.25)'
+                    )}>
+                      <ClockCircleOutlined style={{ fontSize: 20, color: 'rgba(255,255,255,0.8)', marginBottom: 8 }} />
+                      <p style={{...statValueStyle, fontSize: '18px'}}>{formatDateTime(resultData?.restoredAt)}</p>
+                      <p style={statLabelStyle}>恢复时间</p>
+                    </div>
+                  </div>
+
+                  {resultData?.tableDetails && Object.keys(resultData.tableDetails).length > 0 && (
+                    <div style={{ 
+                      padding: '16px', 
+                      background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)',
+                      borderRadius: '16px',
+                      border: '1px solid #e2e8f0',
+                      marginBottom: 16,
+                      animation: 'slideUp 0.5s ease 0.2s forwards',
+                      opacity: 0,
+                    }}>
+                      <div style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'space-between',
+                        marginBottom: 12,
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <div style={{
+                            width: 32,
+                            height: 32,
+                            borderRadius: '8px',
+                            background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}>
+                            <DatabaseOutlined style={{ color: '#fff', fontSize: 16 }} />
+                          </div>
+                          <span style={{ fontWeight: 600, color: '#1e293b', fontSize: 15 }}>
+                            数据表恢复详情
+                          </span>
+                        </div>
+                        <Tag style={{
+                          background: '#eef2ff',
+                          border: '1px solid #c7d2fe',
+                          color: '#4f46e5',
+                          borderRadius: '6px',
+                          padding: '2px 8px',
+                        }}>
+                          共 {Object.keys(resultData.tableDetails).length} 个表
+                        </Tag>
+                      </div>
+                      
+                      <div style={{ 
+                        display: 'grid', 
+                        gridTemplateColumns: 'repeat(2, 1fr)', 
+                        gap: 8,
+                        maxHeight: '240px',
+                        overflowY: 'auto',
+                        padding: '4px',
+                      }}>
+                        {Object.entries(resultData.tableDetails).map(([tableName, tableInfo], index) => (
+                          <div 
+                            key={tableName}
+                            className="table-card"
+                            style={{
+                              ...tableCardStyle,
+                              animationDelay: `${index * 0.03}s`,
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                              <div style={{
+                                width: 8,
+                                height: 8,
+                                borderRadius: '50%',
+                                background: tableInfo.success ? '#10b981' : '#94a3b8',
+                                boxShadow: tableInfo.success ? '0 0 8px rgba(16, 185, 129, 0.5)' : 'none',
+                              }} />
+                              <span style={{ 
+                                fontWeight: 600, 
+                                color: '#334155',
+                                fontSize: 13,
+                              }}>
+                                {tableInfo.displayName || tableName}
+                              </span>
+                            </div>
+                            <div style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 6,
+                              padding: '4px 10px',
+                              borderRadius: '6px',
+                              background: tableInfo.success ? '#ecfdf5' : '#f1f5f9',
+                              border: `1px solid ${tableInfo.success ? '#a7f3d0' : '#e2e8f0'}`,
+                            }}>
+                              <span style={{ 
+                                fontSize: 13, 
+                                fontWeight: 600,
+                                color: tableInfo.success ? '#059669' : '#64748b',
+                              }}>
+                                {tableInfo.recordCount}
+                              </span>
+                              <span style={{ 
+                                fontSize: 11, 
+                                color: tableInfo.success ? '#10b981' : '#94a3b8',
+                              }}>
+                                条
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    padding: '14px 16px',
+                    background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
+                    borderRadius: '12px',
+                    border: '1px solid #bfdbfe',
+                    animation: 'slideUp 0.5s ease 0.3s forwards',
+                    opacity: 0,
+                  }}>
+                    <div style={{
+                      width: 36,
+                      height: 36,
+                      borderRadius: '10px',
+                      background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
                       display: 'flex',
                       alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
                     }}>
-                      <FileTextOutlined style={{ marginRight: 8 }} />
-                      文件恢复详情
-                    </p>
-                    
-                    {data.fileDetails.avatars > 0 && (
-                      <div style={{ marginBottom: 12 }}>
-                        <p style={{ 
-                          margin: '0 0 8px 0', 
-                          fontSize: 13, 
-                          fontWeight: 500,
-                          color: designTokens.colors.text.secondary,
-                        }}>
-                          头像文件：{data.fileDetails.avatars} 个
-                        </p>
-                      </div>
-                    )}
-                    
-                    {data.fileDetails.others > 0 && (
-                      <div>
-                        <p style={{ 
-                          margin: '0 0 8px 0', 
-                          fontSize: 13, 
-                          fontWeight: 500,
-                          color: designTokens.colors.text.secondary,
-                        }}>
-                          其他文件：{data.fileDetails.others} 个
-                        </p>
-                      </div>
-                    )}
+                      <InfoCircleOutlined style={{ color: '#fff', fontSize: 18 }} />
+                    </div>
+                    <div>
+                      <p style={{ margin: 0, fontWeight: 600, color: '#1e40af', fontSize: 14 }}>
+                        建议刷新页面以确保所有数据生效
+                      </p>
+                      <p style={{ margin: '4px 0 0 0', fontSize: 12, color: '#3b82f6' }}>
+                        刷新后可查看最新恢复的数据内容
+                      </p>
+                    </div>
                   </div>
-                )}
+                </div>
+              ),
+              centered: true,
+              maskClosable: false,
+              okText: '完成',
+              cancelButtonProps: { style: { display: 'none' } },
+              okButtonProps: {
+                style: {
+                  background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+                  border: 'none',
+                  borderRadius: '10px',
+                  height: '44px',
+                  padding: '0 32px',
+                  fontSize: '15px',
+                  fontWeight: 600,
+                  boxShadow: '0 4px 12px rgba(99, 102, 241, 0.3)',
+                },
+              },
+            });
+          }, 500);
+        }
 
-                <Alert
-                  message="建议刷新页面以确保所有数据生效"
-                  type="info"
-                  showIcon
-                  style={{ marginTop: 16 }}
-                />
-              </div>
-            ),
-            maskClosable: false,
-            okText: '完成',
-            okButtonProps: {
-              style: primaryButtonStyle,
-            },
+        if (data.stage === 'error') {
+          eventSource.close();
+          setRestoreLoading(false);
+          Modal.error({
+            title: '数据恢复失败',
+            content: data.message,
           });
-        }, 500);
-      } else {
-        throw new Error(response.data?.message || '恢复失败');
+        }
+      } catch (e) {
+        console.error('解析 SSE 数据失败:', e);
       }
-    } catch (error) {
+    };
+
+    eventSource.onerror = (error) => {
+      console.error('SSE 连接错误:', error);
+      eventSource.close();
       setRestoreLoading(false);
       Modal.error({
         title: '数据恢复失败',
-        content: error.response?.data?.message || error.message || '未知错误',
+        content: '连接中断，请重试',
       });
-    }
+    };
   };
 
   const handleDelete = async (filename) => {

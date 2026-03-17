@@ -648,7 +648,7 @@ const PendingDeviceManagement = () => {
     <div style={{ padding: 24, background: designTokens.colors.background.secondary, minHeight: '100vh' }}>
       <Row gutter={16} style={{ marginBottom: 24 }}>
         <Col span={6}>
-          <Card bordered={false} style={{ borderRadius: 12 }}>
+          <Card bordered={false} style={{ borderRadius: 12, height: '100%', minHeight: 100 }}>
             <Statistic
               title="暂存设备总数"
               value={stats.total}
@@ -657,7 +657,7 @@ const PendingDeviceManagement = () => {
           </Card>
         </Col>
         <Col span={6}>
-          <Card bordered={false} style={{ borderRadius: 12 }}>
+          <Card bordered={false} style={{ borderRadius: 12, height: '100%', minHeight: 100 }}>
             <Statistic
               title="待同步"
               value={stats.pending}
@@ -667,7 +667,7 @@ const PendingDeviceManagement = () => {
           </Card>
         </Col>
         <Col span={6}>
-          <Card bordered={false} style={{ borderRadius: 12 }}>
+          <Card bordered={false} style={{ borderRadius: 12, height: '100%', minHeight: 100 }}>
             <Statistic
               title="已同步"
               value={stats.synced}
@@ -677,7 +677,7 @@ const PendingDeviceManagement = () => {
           </Card>
         </Col>
         <Col span={6}>
-          <Card bordered={false} style={{ borderRadius: 12 }}>
+          <Card bordered={false} style={{ borderRadius: 12, height: '100%', minHeight: 100 }}>
             <Statistic
               title="同步进度"
               value={stats.total > 0 ? Math.round((stats.synced / stats.total) * 100) : 0}

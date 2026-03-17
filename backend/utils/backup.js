@@ -8,8 +8,25 @@ const path = require('path');
 const crypto = require('crypto');
 const zlib = require('zlib');
 const { pipeline } = require('stream/promises');
+const { sequelize, dbDialect } = require('../db');
 
 const BACKUP_VERSION = '2.0.0';
+
+async function disableForeignKeyChecks() {
+  if (dbDialect === 'sqlite') {
+    await sequelize.query('PRAGMA foreign_keys = OFF');
+  } else if (dbDialect === 'mysql') {
+    await sequelize.query('SET FOREIGN_KEY_CHECKS = 0');
+  }
+}
+
+async function enableForeignKeyChecks() {
+  if (dbDialect === 'sqlite') {
+    await sequelize.query('PRAGMA foreign_keys = ON');
+  } else if (dbDialect === 'mysql') {
+    await sequelize.query('SET FOREIGN_KEY_CHECKS = 1');
+  }
+}
 
 // 数据表名称中英文映射
 const TABLE_NAME_MAPPING = {
@@ -684,99 +701,105 @@ async function restoreData(backupData, options = {}) {
     return results;
   }
 
-  for (const tableName of RESTORE_ORDER) {
-    if (skipTables.includes(tableName)) {
-      results.skipped.push(tableName);
-      onProgress(tableName, 'skipped');
-      continue;
-    }
+  await disableForeignKeyChecks();
 
-    const tableData = dataToRestore[tableName];
-    if (!tableData || !Array.isArray(tableData) || tableData.length === 0) {
-      onProgress(tableName, 'empty');
-      continue;
-    }
-
-    const config = BACKUP_MODELS_CONFIG.find(c => c.name === tableName);
-    if (!config) {
-      results.errors.push({ table: tableName, error: '未找到模型配置' });
-      continue;
-    }
-
-    try {
-      const Model = require(config.modelPath);
-      
-      if (overwriteExisting) {
-        await Model.destroy({ where: {}, truncate: true });
+  try {
+    for (const tableName of RESTORE_ORDER) {
+      if (skipTables.includes(tableName)) {
+        results.skipped.push(tableName);
+        onProgress(tableName, 'skipped');
+        continue;
       }
 
-      const processedRecords = tableData.map(record => {
-        const processed = { ...record };
+      const tableData = dataToRestore[tableName];
+      if (!tableData || !Array.isArray(tableData) || tableData.length === 0) {
+        onProgress(tableName, 'empty');
+        continue;
+      }
+
+      const config = BACKUP_MODELS_CONFIG.find(c => c.name === tableName);
+      if (!config) {
+        results.errors.push({ table: tableName, error: '未找到模型配置' });
+        continue;
+      }
+
+      try {
+        const Model = require(config.modelPath);
         
-        if (tableName === 'Device' && processed.customFields !== undefined && processed.customFields !== null) {
-          if (typeof processed.customFields === 'string') {
-            try {
-              processed.customFields = JSON.parse(processed.customFields);
-            } catch (e) {
-              console.warn(`解析 Device.customFields 失败：${processed.deviceId}, 错误：${e.message}`);
-              processed.customFields = {};
+        if (overwriteExisting) {
+          await Model.destroy({ where: {}, truncate: true });
+        }
+
+        const processedRecords = tableData.map(record => {
+          const processed = { ...record };
+          
+          if (tableName === 'Device' && processed.customFields !== undefined && processed.customFields !== null) {
+            if (typeof processed.customFields === 'string') {
+              try {
+                processed.customFields = JSON.parse(processed.customFields);
+              } catch (e) {
+                console.warn(`解析 Device.customFields 失败：${processed.deviceId}, 错误：${e.message}`);
+                processed.customFields = {};
+              }
             }
           }
-        }
-        
-        return processed;
-      });
+          
+          return processed;
+        });
 
-      let insertedCount = 0;
-      for (const record of processedRecords) {
-        try {
-          await Model.create(record, { validate: false, silent: true });
-          insertedCount++;
-        } catch (insertError) {
-          if (insertError.name === 'SequelizeUniqueConstraintError') {
-            try {
-              await Model.upsert(record, { validate: false, silent: true });
-              insertedCount++;
-            } catch (upsertError) {
+        let insertedCount = 0;
+        for (const record of processedRecords) {
+          try {
+            await Model.create(record, { validate: false, silent: true });
+            insertedCount++;
+          } catch (insertError) {
+            if (insertError.name === 'SequelizeUniqueConstraintError') {
+              try {
+                await Model.upsert(record, { validate: false, silent: true });
+                insertedCount++;
+              } catch (upsertError) {
+                results.errors.push({
+                  table: tableName,
+                  record: record[Object.keys(record)[0]],
+                  error: upsertError.message,
+                });
+              }
+            } else {
               results.errors.push({
                 table: tableName,
                 record: record[Object.keys(record)[0]],
-                error: upsertError.message,
+                error: insertError.message,
               });
             }
-          } else {
-            results.errors.push({
-              table: tableName,
-              record: record[Object.keys(record)[0]],
-              error: insertError.message,
-            });
           }
         }
+
+        results.tablesRestored++;
+        results.recordsRestored += insertedCount;
+        
+        results.tableDetails[tableName] = {
+          recordCount: insertedCount,
+          displayName: TABLE_NAME_MAPPING[tableName] || tableName,
+          success: insertedCount > 0,
+        };
+        
+        onProgress(tableName, 'restored', insertedCount);
+      } catch (error) {
+        results.errors.push({ table: tableName, error: error.message });
+        onProgress(tableName, 'error', error.message);
       }
-
-      results.tablesRestored++;
-      results.recordsRestored += insertedCount;
-      
-      results.tableDetails[tableName] = {
-        recordCount: insertedCount,
-        displayName: TABLE_NAME_MAPPING[tableName] || tableName,
-        success: insertedCount > 0,
-      };
-      
-      onProgress(tableName, 'restored', insertedCount);
-    } catch (error) {
-      results.errors.push({ table: tableName, error: error.message });
-      onProgress(tableName, 'error', error.message);
     }
-  }
 
-  if (isIncremental && backupData.incrementalData) {
-    console.log('\n恢复增量数据...');
-    const incrementalResults = await restoreIncrementalData(backupData.incrementalData, options);
-    results.tablesRestored += incrementalResults.tablesRestored;
-    results.recordsRestored += incrementalResults.recordsRestored;
-    results.errors.push(...incrementalResults.errors);
-    Object.assign(results.tableDetails, incrementalResults.tableDetails);
+    if (isIncremental && backupData.incrementalData) {
+      console.log('\n恢复增量数据...');
+      const incrementalResults = await restoreIncrementalData(backupData.incrementalData, options);
+      results.tablesRestored += incrementalResults.tablesRestored;
+      results.recordsRestored += incrementalResults.recordsRestored;
+      results.errors.push(...incrementalResults.errors);
+      Object.assign(results.tableDetails, incrementalResults.tableDetails);
+    }
+  } finally {
+    await enableForeignKeyChecks();
   }
 
   return results;

@@ -3,6 +3,7 @@ const router = express.Router();
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
+const { authMiddleware } = require('../middleware/auth');
 const {
   getBackupPath,
   ensureBackupDir,
@@ -171,6 +172,114 @@ router.get('/validate/:filename', async (req, res) => {
       message: '验证备份文件失败',
       error: error.message,
     });
+  }
+});
+
+router.get('/restore-progress/:filename', authMiddleware, async (req, res) => {
+  const { filename } = req.params;
+  const options = req.query.options ? JSON.parse(req.query.options) : {};
+
+  if (!filename) {
+    return res.status(400).json({
+      success: false,
+      message: '请提供备份文件名',
+    });
+  }
+
+  const backupPath = getBackupPath();
+  const filePath = path.join(backupPath, filename);
+
+  if (!fs.existsSync(filePath)) {
+    return res.status(404).json({
+      success: false,
+      message: '备份文件不存在',
+    });
+  }
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no');
+
+  const sendProgress = (data) => {
+    res.write(`data: ${JSON.stringify(data)}\n\n`);
+  };
+
+  try {
+    console.log(`开始恢复备份: ${filename}`);
+    sendProgress({ stage: 'start', message: '正在验证备份文件...', progress: 5 });
+
+    const validation = await validateBackupFile(filePath);
+    if (!validation.valid) {
+      sendProgress({ stage: 'error', message: `备份文件验证失败: ${validation.error}`, progress: 0 });
+      res.end();
+      return;
+    }
+
+    sendProgress({ stage: 'validate', message: '备份文件验证通过', progress: 10, metadata: validation.metadata });
+
+    const buffer = fs.readFileSync(filePath);
+    const isCompressed = filePath.endsWith('.gz');
+    
+    let backupData;
+    if (isCompressed) {
+      sendProgress({ stage: 'decompress', message: '正在解压备份文件...', progress: 15 });
+      const decompressed = zlib.gunzipSync(buffer);
+      backupData = JSON.parse(decompressed.toString('utf8'));
+    } else {
+      backupData = JSON.parse(buffer.toString('utf8'));
+    }
+
+    sendProgress({ stage: 'parse', message: '正在解析备份数据...', progress: 20 });
+
+    const totalTables = require('../utils/backup').RESTORE_ORDER.length;
+    let processedTables = 0;
+
+    const result = await restoreBackup(filePath, {
+      overwriteExisting: options.overwriteExisting !== false,
+      skipTables: options.skipTables || [],
+      skipFiles: options.skipFiles === true,
+      onProgress: (tableName, status, count) => {
+        processedTables++;
+        const progress = 20 + Math.floor((processedTables / totalTables) * 70);
+        const statusMap = {
+          'restored': '已恢复',
+          'skipped': '已跳过',
+          'empty': '无数据',
+          'error': '错误',
+        };
+        sendProgress({
+          stage: 'restore',
+          message: `正在恢复: ${tableName} (${statusMap[status] || status}${count ? ` - ${count} 条` : ''})`,
+          progress,
+          currentTable: tableName,
+          status,
+          count,
+          processedTables,
+          totalTables,
+        });
+      },
+    });
+
+    sendProgress({ 
+      stage: 'complete', 
+      message: '恢复完成!', 
+      progress: 100,
+      result: {
+        tablesRestored: result.tablesRestored,
+        recordsRestored: result.recordsRestored,
+        filesRestored: result.filesRestored,
+        restoredAt: result.restoredAt,
+        tableDetails: result.tableDetails,
+        fileDetails: result.fileDetails,
+      }
+    });
+
+    res.end();
+  } catch (error) {
+    console.error('恢复备份失败:', error);
+    sendProgress({ stage: 'error', message: `恢复失败: ${error.message}`, progress: 0 });
+    res.end();
   }
 });
 

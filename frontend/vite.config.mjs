@@ -51,6 +51,15 @@ export default defineConfig({
     host: '0.0.0.0',
     port: port,
     proxy: {
+      '/api/backup/restore-progress': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        configure: (proxy, _options) => {
+          proxy.on('proxyReq', (proxyReq, req, _res) => {
+            proxyReq.setHeader('Connection', 'keep-alive');
+          });
+        }
+      },
       '/api': {
         target: 'http://localhost:8000',
         changeOrigin: true
