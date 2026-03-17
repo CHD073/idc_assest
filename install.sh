@@ -400,8 +400,46 @@ main() {
     if command_exists npm; then
         log_success "npm $(npm -v)"
     else
-        log_error "npm 未安装"
-        exit 1
+        log_warning "npm 未安装，尝试自动安装..."
+        
+        local distro=$(detect_distro)
+        local sudo=$(get_sudo)
+        
+        case $distro in
+            ubuntu|debian)
+                $sudo apt-get update -qq
+                $sudo apt-get install -y -qq npm
+                ;;
+            centos|rhel|fedora|rocky|almalinux)
+                $sudo yum install -y -q npm
+                ;;
+            arch|manjaro)
+                $sudo pacman -S --noconfirm npm
+                ;;
+            *)
+                # 尝试使用 Node.js 自带的 corepack 启用 npm
+                if command_exists corepack; then
+                    log_info "尝试使用 corepack 启用 npm..."
+                    corepack enable
+                    corepack prepare npm@latest --activate
+                else
+                    log_error "无法自动安装 npm，请手动安装"
+                    echo -e "\n${YELLOW}手动安装 npm：${RESET}"
+                    echo "  Ubuntu/Debian: sudo apt-get install npm"
+                    echo "  CentOS/RHEL: sudo yum install npm"
+                    echo "  或重新安装 Node.js: curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - && sudo apt-get install -y nodejs"
+                    exit 1
+                fi
+                ;;
+        esac
+        
+        # 再次检查 npm
+        if command_exists npm; then
+            log_success "npm $(npm -v) 安装成功"
+        else
+            log_error "npm 安装失败，请手动安装"
+            exit 1
+        fi
     fi
     
     log_divider
