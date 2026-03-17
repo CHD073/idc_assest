@@ -2,7 +2,7 @@
 
 /**
  * ============================================================================
- * IDC设备管理系统 - 卸载脚本
+ * IDC设备管理系统 - 卸载脚本 v2.0.0
  * ============================================================================
  *
  * 功能说明：
@@ -13,24 +13,20 @@
  *   - 可选删除 node_modules 和构建产物
  *
  * 使用方法：
- *   node uninstall.js
- *
- * 注意事项：
- *   - 卸载前请确保已备份重要数据
- *   - 此脚本不会删除项目源代码
- *   - MySQL 数据库不会被删除，需手动清理
- * ============================================================================
+ *   node uninstall.js              # 交互式卸载
+ *   node uninstall.js --help       # 查看帮助
+ *   node uninstall.js --force      # 强制卸载（无需确认）
+ *   node uninstall.js --backup     # 卸载前自动备份
  */
 
-// Node.js 内置模块引入
 const readline = require('readline');
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
-// =============================================================================
-// 工具函数：颜色输出和日志
-// =============================================================================
+const SCRIPT_VERSION = '2.0.0';
+const BACKUP_DIR = path.join(__dirname, 'backup');
+const LOG_DIR = path.join(__dirname, 'logs');
 
 const colors = {
   reset: '\x1b[0m',
@@ -39,7 +35,8 @@ const colors = {
   yellow: '\x1b[33m',
   red: '\x1b[31m',
   cyan: '\x1b[36m',
-  gray: '\x1b[90m'
+  gray: '\x1b[90m',
+  magenta: '\x1b[35m'
 };
 
 const log = {
@@ -48,8 +45,71 @@ const log = {
   warning: (msg) => console.log(`${colors.yellow}⚠${colors.reset} ${msg}`),
   error: (msg) => console.log(`${colors.red}✗${colors.reset} ${msg}`),
   step: (msg) => console.log(`\n${colors.bright}${colors.cyan}▶ ${msg}${colors.reset}`),
-  divider: () => console.log(`${colors.gray}${'─'.repeat(60)}${colors.reset}`)
+  divider: () => console.log(`${colors.gray}${'─'.repeat(60)}${colors.reset}`),
+  subStep: (msg) => console.log(`  ${colors.gray}└${colors.reset} ${msg}`)
 };
+
+let logFileStream = null;
+let uninstallStartTime = null;
+let deletedItems = [];
+let backedUpItems = [];
+
+function parseArgs() {
+  const args = process.argv.slice(2);
+  return {
+    force: args.includes('--force') || args.includes('-f'),
+    backup: args.includes('--backup') || args.includes('-b'),
+    skipDb: args.includes('--skip-db'),
+    skipDeps: args.includes('--skip-deps'),
+    help: args.includes('--help') || args.includes('-h')
+  };
+}
+
+function showHelp() {
+  console.log(`
+${colors.bright}IDC设备管理系统 - 卸载脚本 v${SCRIPT_VERSION}${colors.reset}
+
+用法: node uninstall.js [选项]
+
+选项:
+  -f, --force       强制卸载（无需确认）
+  -b, --backup      卸载前自动备份数据库
+  --skip-db         跳过数据库删除
+  --skip-deps       跳过依赖删除
+  -h, --help        显示帮助信息
+
+示例:
+  node uninstall.js              # 交互式卸载
+  node uninstall.js --force      # 强制卸载
+  node uninstall.js --backup     # 卸载前备份
+`);
+  process.exit(0);
+}
+
+function initLogFile() {
+  if (!fs.existsSync(LOG_DIR)) {
+    fs.mkdirSync(LOG_DIR, { recursive: true });
+  }
+  const logFileName = `uninstall_${new Date().toISOString().replace(/[:.]/g, '-')}.log`;
+  const logFilePath = path.join(LOG_DIR, logFileName);
+  logFileStream = fs.createWriteStream(logFilePath, { flags: 'a' });
+  
+  const originalConsoleLog = console.log;
+  console.log = (...args) => {
+    const timestamp = new Date().toISOString();
+    const message = args.map(arg => 
+      typeof arg === 'string' ? arg.replace(/\x1b\[[0-9;]*m/g, '') : String(arg)
+    ).join(' ');
+    logFileStream.write(`[${timestamp}] ${message}\n`);
+    originalConsoleLog.apply(console, args);
+  };
+}
+
+function closeLogFile() {
+  if (logFileStream) {
+    logFileStream.end();
+  }
+}
 
 // =============================================================================
 // 交互式输入函数
@@ -257,9 +317,9 @@ async function cleanupConfigFiles() {
   log.step('清理生成的配置文件');
 
   const filesToDelete = [
-    { path: path.join(__dirname, 'backend', '.env'), name: '后端环境变量 (.env)' },
-    { path: path.join(__dirname, 'deploy', 'ecosystem.config.js'), name: 'PM2 配置 (ecosystem.config.js)' },
-    { path: path.join(__dirname, 'deploy', 'nginx-idc.conf'), name: 'Nginx 配置 (nginx-idc.conf)' }
+    { path: path.join(__dirname, 'backend', '.env'), name: '后端环境变量 (.env)', type: '配置文件' },
+    { path: path.join(__dirname, 'deploy', 'ecosystem.config.js'), name: 'PM2 配置 (ecosystem.config.js)', type: '配置文件' },
+    { path: path.join(__dirname, 'deploy', 'nginx-idc.conf'), name: 'Nginx 配置 (nginx-idc.conf)', type: '配置文件' }
   ];
 
   for (const file of filesToDelete) {
@@ -267,6 +327,7 @@ async function cleanupConfigFiles() {
       try {
         fs.unlinkSync(file.path);
         log.success(`${file.name} 已删除`);
+        deletedItems.push({ type: file.type, name: file.name });
       } catch (error) {
         log.error(`删除 ${file.name} 失败: ${error.message}`);
       }
@@ -275,7 +336,6 @@ async function cleanupConfigFiles() {
     }
   }
 
-  // 检查 deploy 目录是否为空，如果是则删除
   const deployDir = path.join(__dirname, 'deploy');
   if (fs.existsSync(deployDir)) {
     try {
@@ -283,6 +343,7 @@ async function cleanupConfigFiles() {
       if (files.length === 0) {
         fs.rmdirSync(deployDir);
         log.success('deploy 目录已删除');
+        deletedItems.push({ type: '目录', name: 'deploy/' });
       } else {
         log.info('deploy 目录不为空，保留');
       }
@@ -350,10 +411,10 @@ async function cleanupDatabase() {
       const confirm = await ask('\n是否删除 SQLite 数据库文件? (y/N)', 'N');
       if (confirm.toLowerCase() === 'y') {
         try {
-          // 尝试停止服务后再删除（避免文件被占用）
           log.info('正在删除数据库文件...');
           fs.unlinkSync(sqliteDbPath);
           log.success('SQLite 数据库已删除');
+          deletedItems.push({ type: '数据库', name: `SQLite (${dbSize} MB)` });
         } catch (error) {
           log.error(`删除失败: ${error.message}`);
           if (error.message.includes('EBUSY') || error.message.includes('resource busy')) {
@@ -399,11 +460,11 @@ async function cleanupDatabase() {
 // 依赖和构建产物清理
 // =============================================================================
 
-async function cleanupDependencies() {
+async function cleanupDependencies(cmdArgs) {
   log.step('依赖和构建产物清理');
 
   log.warning('此操作将删除 node_modules 和构建产物，需要重新安装依赖才能再次运行');
-  const confirm = await ask('是否删除依赖和构建产物? (y/N)', 'N');
+  const confirm = cmdArgs?.force ? 'y' : await ask('是否删除依赖和构建产物? (y/N)', 'N');
 
   if (confirm.toLowerCase() !== 'y') {
     log.info('跳过依赖清理');
@@ -411,9 +472,9 @@ async function cleanupDependencies() {
   }
 
   const dirsToDelete = [
-    { path: path.join(__dirname, 'backend', 'node_modules'), name: '后端 node_modules' },
-    { path: path.join(__dirname, 'frontend', 'node_modules'), name: '前端 node_modules' },
-    { path: path.join(__dirname, 'frontend', 'dist'), name: '前端构建产物 (dist)' }
+    { path: path.join(__dirname, 'backend', 'node_modules'), name: '后端 node_modules', type: '依赖' },
+    { path: path.join(__dirname, 'frontend', 'node_modules'), name: '前端 node_modules', type: '依赖' },
+    { path: path.join(__dirname, 'frontend', 'dist'), name: '前端构建产物 (dist)', type: '构建产物' }
   ];
 
   for (const dir of dirsToDelete) {
@@ -421,6 +482,7 @@ async function cleanupDependencies() {
       try {
         fs.rmSync(dir.path, { recursive: true, force: true });
         log.success(`${dir.name} 已删除`);
+        deletedItems.push({ type: dir.type, name: dir.name });
       } catch (error) {
         log.error(`删除 ${dir.name} 失败: ${error.message}`);
       }
@@ -463,52 +525,130 @@ async function cleanupLogs() {
 // 主函数
 // =============================================================================
 
+async function backupDatabase() {
+  log.step('备份数据库');
+  
+  const sqliteDbPath = path.join(__dirname, 'backend', 'idc_management.db');
+  if (!fs.existsSync(sqliteDbPath)) {
+    log.info('未找到 SQLite 数据库文件，跳过备份');
+    return false;
+  }
+  
+  if (!fs.existsSync(BACKUP_DIR)) {
+    fs.mkdirSync(BACKUP_DIR, { recursive: true });
+  }
+  
+  const backupPath = path.join(BACKUP_DIR, `database_backup_${Date.now()}.db`);
+  
+  try {
+    fs.copyFileSync(sqliteDbPath, backupPath);
+    backedUpItems.push({ type: '数据库', path: backupPath });
+    log.success(`数据库已备份: ${path.basename(backupPath)}`);
+    return true;
+  } catch (error) {
+    log.error(`备份失败: ${error.message}`);
+    return false;
+  }
+}
+
+function printSummary() {
+  const duration = ((Date.now() - uninstallStartTime) / 1000).toFixed(1);
+  
+  console.log(`
+${colors.bright}${colors.magenta}
+╔══════════════════════════════════════════════════════════╗
+║                    卸载摘要                               ║
+╚══════════════════════════════════════════════════════════╝${colors.reset}`);
+
+  console.log(`\n  ${colors.cyan}卸载耗时:${colors.reset} ${duration} 秒`);
+  
+  if (deletedItems.length > 0) {
+    console.log(`\n  ${colors.cyan}已删除项目:${colors.reset}`);
+    deletedItems.forEach(item => {
+      console.log(`    - ${item.type}: ${item.name}`);
+    });
+  }
+  
+  if (backedUpItems.length > 0) {
+    console.log(`\n  ${colors.cyan}已备份项目:${colors.reset}`);
+    backedUpItems.forEach(item => {
+      console.log(`    - ${item.type}: ${path.basename(item.path)}`);
+    });
+    console.log(`\n  ${colors.yellow}备份位置:${colors.reset} ${BACKUP_DIR}`);
+  }
+  
+  console.log(`\n  ${colors.cyan}保留的文件:${colors.reset}`);
+  console.log(`    - 项目源代码 (backend/, frontend/)`);
+  console.log(`    - 上传的文件 (backend/uploads/)`);
+  
+  console.log(`\n  ${colors.cyan}重新部署:${colors.reset}`);
+  console.log(`    node install.js`);
+  
+  log.divider();
+  log.success('卸载完成！');
+}
+
 async function main() {
+  uninstallStartTime = Date.now();
+  const cmdArgs = parseArgs();
+  
+  if (cmdArgs.help) {
+    showHelp();
+    return;
+  }
+  
+  initLogFile();
+
   console.log(`
 ${colors.bright}${colors.yellow}
 ╔══════════════════════════════════════════════════════════╗
-║     IDC设备管理系统 - 卸载脚本                              ║
+║     IDC设备管理系统 - 卸载脚本 v${SCRIPT_VERSION}                  ║
 ║     Uninstallation Script                                 ║
 ╚══════════════════════════════════════════════════════════╝
 ${colors.reset}`);
 
   log.warning('此脚本将卸载 IDC设备管理系统');
-  log.warning('请确保已备份重要数据！');
+  
+  if (cmdArgs.force) {
+    log.info('运行模式: 强制卸载（无需确认）');
+  }
+  
   log.divider();
 
-  const confirm = await ask('确认要开始卸载? (y/N)', 'N');
-  if (confirm.toLowerCase() !== 'y') {
-    log.info('已取消卸载');
-    rl.close();
-    return;
+  if (!cmdArgs.force) {
+    const confirm = await ask('确认要开始卸载? (y/N)', 'N');
+    if (confirm.toLowerCase() !== 'y') {
+      log.info('已取消卸载');
+      rl.close();
+      closeLogFile();
+      return;
+    }
   }
 
   try {
-    // 步骤1：停止并删除服务
+    if (cmdArgs.backup) {
+      await backupDatabase();
+    }
+    
     await stopAndDeleteServices();
-
-    // 步骤2：清理 Nginx 配置
     await cleanupNginxConfig();
-
-    // 步骤3：清理配置文件
     await cleanupConfigFiles();
-
-    // 步骤4：数据库清理
-    await cleanupDatabase();
-
-    // 步骤5：日志清理
+    
+    if (!cmdArgs.skipDb) {
+      await cleanupDatabase();
+    } else {
+      log.info('已跳过数据库删除');
+    }
+    
     await cleanupLogs();
+    
+    if (!cmdArgs.skipDeps) {
+      await cleanupDependencies();
+    } else {
+      log.info('已跳过依赖删除');
+    }
 
-    // 步骤6：依赖和构建产物清理（可选）
-    await cleanupDependencies();
-
-    // 完成
-    log.divider();
-    log.success('卸载完成！');
-    console.log(`\n${colors.bright}系统已完全卸载，以下文件保留：${colors.reset}`);
-    console.log(`  - 项目源代码（backend/、frontend/）`);
-    console.log(`  - 上传的文件（如有）`);
-    console.log(`\n如需重新部署，请运行: ${colors.cyan}node install.js${colors.reset}`);
+    printSummary();
 
   } catch (error) {
     log.error(`卸载失败: ${error.message}`);
@@ -516,8 +656,8 @@ ${colors.reset}`);
     process.exit(1);
   } finally {
     rl.close();
+    closeLogFile();
   }
 }
 
-// 运行主函数
 main();

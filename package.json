@@ -8,7 +8,8 @@
     "start:frontend": "cd frontend && npm run dev",
     "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install",
     "deploy": "node install.js",
-    "update": "node update.js"
+    "update": "node update.js",
+    "uninstall": "node uninstall.js"
   },
   "keywords": [
     "idc",

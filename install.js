@@ -15,12 +15,12 @@
  *   - 使用 PM2 启动和管理后端服务
  * 
  * 使用方法：
- *   node install.js
- *   或
- *   npm run deploy
+ *   node install.js                    # 交互式安装
+ *   node install.js --help             # 查看帮助
+ *   node install.js --non-interactive  # 非交互式（使用默认配置）
  * 
  * 系统要求：
- *   - Node.js >= 14.0.0
+ *   - Node.js >= 16.0.0
  *   - npm >= 6.0.0
  *   - Windows/Linux/macOS
  * 
@@ -29,53 +29,98 @@
  * ============================================================================
  */
 
-// Node.js 内置模块引入
-const readline = require('readline');      // 读取命令行输入
-const { execSync } = require('child_process'); // 执行系统命令
-const fs = require('fs');                  // 文件系统操作
-const path = require('path');              // 路径处理
+const readline = require('readline');
+const { execSync, spawn } = require('child_process');
+const fs = require('fs');
+const path = require('path');
 
-// =============================================================================
-// 工具函数：颜色输出和日志
-// =============================================================================
+const SCRIPT_VERSION = '2.0.0';
+const MIN_NODE_VERSION = 16;
+const LOG_DIR = path.join(__dirname, 'logs');
 
-/**
- * ANSI 颜色代码配置
- * 用于在终端输出彩色文字，提升可读性
- */
 const colors = {
-  reset: '\x1b[0m',       // 重置颜色
-  bright: '\x1b[1m',      // 高亮
-  green: '\x1b[32m',      // 绿色（成功）
-  yellow: '\x1b[33m',     // 黄色（警告）
-  red: '\x1b[31m',        // 红色（错误）
-  cyan: '\x1b[36m',       // 青色（信息）
-  gray: '\x1b[90m'        // 灰色（分隔线）
+  reset: '\x1b[0m',
+  bright: '\x1b[1m',
+  green: '\x1b[32m',
+  yellow: '\x1b[33m',
+  red: '\x1b[31m',
+  cyan: '\x1b[36m',
+  gray: '\x1b[90m',
+  magenta: '\x1b[35m'
 };
 
-/**
- * 日志输出工具对象
- * 提供统一格式的日志输出方法
- */
 const log = {
-  /** 信息日志 - 青色 */
   info: (msg) => console.log(`${colors.cyan}ℹ${colors.reset} ${msg}`),
-  
-  /** 成功日志 - 绿色带勾选 */
   success: (msg) => console.log(`${colors.green}✓${colors.reset} ${msg}`),
-  
-  /** 警告日志 - 黄色带警告符号 */
   warning: (msg) => console.log(`${colors.yellow}⚠${colors.reset} ${msg}`),
-  
-  /** 错误日志 - 红色带叉号 */
   error: (msg) => console.log(`${colors.red}✗${colors.reset} ${msg}`),
-  
-  /** 步骤日志 - 高亮青色带箭头 */
   step: (msg) => console.log(`\n${colors.bright}${colors.cyan}▶ ${msg}${colors.reset}`),
-  
-  /** 分隔线 - 灰色横线 */
-  divider: () => console.log(`${colors.gray}${'─'.repeat(60)}${colors.reset}`)
+  divider: () => console.log(`${colors.gray}${'─'.repeat(60)}${colors.reset}`),
+  subStep: (msg) => console.log(`  ${colors.gray}└${colors.reset} ${msg}`)
 };
+
+let logFileStream = null;
+let installStartTime = null;
+
+function parseArgs() {
+  const args = process.argv.slice(2);
+  return {
+    nonInteractive: args.includes('--non-interactive') || args.includes('-y'),
+    skipNginx: args.includes('--skip-nginx'),
+    skipBuild: args.includes('--skip-build'),
+    dbType: args.find(a => a.startsWith('--db='))?.split('=')[1],
+    backendPort: args.find(a => a.startsWith('--port='))?.split('=')[1],
+    help: args.includes('--help') || args.includes('-h')
+  };
+}
+
+function showHelp() {
+  console.log(`
+${colors.bright}IDC设备管理系统 - 安装部署脚本 v${SCRIPT_VERSION}${colors.reset}
+
+用法: node install.js [选项]
+
+选项:
+  -y, --non-interactive  非交互式安装（使用默认配置）
+  --skip-nginx           跳过 Nginx 配置
+  --skip-build           跳过前端构建
+  --db=<type>            数据库类型 (sqlite/mysql)
+  --port=<port>          后端端口
+  -h, --help             显示帮助信息
+
+示例:
+  node install.js                        # 交互式安装
+  node install.js -y                     # 使用默认配置快速安装
+  node install.js -y --db=mysql          # 使用 MySQL 数据库
+  node install.js -y --port=3000         # 指定后端端口
+`);
+  process.exit(0);
+}
+
+function initLogFile() {
+  if (!fs.existsSync(LOG_DIR)) {
+    fs.mkdirSync(LOG_DIR, { recursive: true });
+  }
+  const logFileName = `install_${new Date().toISOString().replace(/[:.]/g, '-')}.log`;
+  const logFilePath = path.join(LOG_DIR, logFileName);
+  logFileStream = fs.createWriteStream(logFilePath, { flags: 'a' });
+  
+  const originalConsoleLog = console.log;
+  console.log = (...args) => {
+    const timestamp = new Date().toISOString();
+    const message = args.map(arg => 
+      typeof arg === 'string' ? arg.replace(/\x1b\[[0-9;]*m/g, '') : String(arg)
+    ).join(' ');
+    logFileStream.write(`[${timestamp}] ${message}\n`);
+    originalConsoleLog.apply(console, args);
+  };
+}
+
+function closeLogFile() {
+  if (logFileStream) {
+    logFileStream.end();
+  }
+}
 
 // =============================================================================
 // 配置存储对象
@@ -286,12 +331,12 @@ function commandExists(command) {
 /**
  * 检查 Node.js 版本是否满足要求
  * 
- * @returns {boolean} 版本是否 >= 14.0.0
+ * @returns {boolean} 版本是否 >= MIN_NODE_VERSION
  */
 function checkNodeVersion() {
-  const version = process.version;  // 获取当前 Node 版本，如 "v20.10.0"
-  const major = parseInt(version.slice(1).split('.')[0]);  // 提取主版本号
-  return major >= 14;
+  const version = process.version;
+  const major = parseInt(version.slice(1).split('.')[0]);
+  return major >= MIN_NODE_VERSION;
 }
 
 /**
@@ -785,29 +830,76 @@ async function checkEnvironment() {
  *   1. 选择数据库类型（SQLite / MySQL）
  *   2. 如选择 MySQL，提示输入连接参数
  */
-async function configureDatabase() {
+async function configureDatabase(cmdArgs) {
   log.step('数据库配置');
 
-  // 选择数据库类型
-  config.dbType = await select('选择数据库类型：', [
-    { label: 'SQLite（零配置，适合开发/小规模）', value: 'sqlite' },
-    { label: 'MySQL（生产环境推荐）', value: 'mysql' }
-  ]);
+  if (cmdArgs?.nonInteractive && cmdArgs?.dbType) {
+    config.dbType = cmdArgs.dbType;
+    log.info(`使用命令行参数: 数据库类型 = ${config.dbType}`);
+  } else if (cmdArgs?.nonInteractive) {
+    config.dbType = 'sqlite';
+    log.info('使用默认配置: 数据库类型 = sqlite');
+  } else {
+    config.dbType = await select('选择数据库类型：', [
+      { label: 'SQLite（零配置，适合开发/小规模）', value: 'sqlite' },
+      { label: 'MySQL（生产环境推荐）', value: 'mysql' }
+    ]);
+  }
 
-  // MySQL 配置
   if (config.dbType === 'mysql') {
     console.log('\n' + colors.yellow + '请确保MySQL服务已启动并创建了数据库' + colors.reset);
     console.log(colors.gray + '创建数据库命令: CREATE DATABASE idc_management CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;' + colors.reset + '\n');
 
-    // 依次询问 MySQL 连接参数
-    config.dbConfig.host = await ask('MySQL 主机地址', 'localhost');
-    config.dbConfig.port = await ask('MySQL 端口', '3306');
-    config.dbConfig.username = await ask('MySQL 用户名', 'root');
-    config.dbConfig.password = await askPassword('MySQL 密码');
-    config.dbConfig.database = await ask('数据库名称', 'idc_management');
+    if (cmdArgs?.nonInteractive) {
+      config.dbConfig.host = process.env.MYSQL_HOST || 'localhost';
+      config.dbConfig.port = process.env.MYSQL_PORT || '3306';
+      config.dbConfig.username = process.env.MYSQL_USER || 'root';
+      config.dbConfig.password = process.env.MYSQL_PASSWORD || '';
+      config.dbConfig.database = process.env.MYSQL_DATABASE || 'idc_management';
+      log.info(`MySQL 配置: ${config.dbConfig.host}:${config.dbConfig.port}/${config.dbConfig.database}`);
+    } else {
+      config.dbConfig.host = await ask('MySQL 主机地址', 'localhost');
+      config.dbConfig.port = await ask('MySQL 端口', '3306');
+      config.dbConfig.username = await ask('MySQL 用户名', 'root');
+      config.dbConfig.password = await askPassword('MySQL 密码');
+      config.dbConfig.database = await ask('数据库名称', 'idc_management');
+    }
+
+    const testResult = await testMySQLConnection();
+    if (!testResult.success) {
+      log.error(`MySQL 连接测试失败: ${testResult.error}`);
+      const retry = cmdArgs?.nonInteractive ? false : await ask('是否重新配置? (Y/n)', 'Y');
+      if (retry.toLowerCase() === 'y') {
+        return await configureDatabase(cmdArgs);
+      }
+      log.warning('将继续部署，但数据库可能无法正常工作');
+    }
   }
 
   log.divider();
+}
+
+async function testMySQLConnection() {
+  log.subStep('测试 MySQL 连接...');
+  
+  try {
+    const mysql = require('mysql2/promise');
+    const connection = await mysql.createConnection({
+      host: config.dbConfig.host,
+      port: parseInt(config.dbConfig.port),
+      user: config.dbConfig.username,
+      password: config.dbConfig.password,
+      database: config.dbConfig.database,
+      connectTimeout: 5000
+    });
+    
+    await connection.execute('SELECT 1');
+    await connection.end();
+    log.success('MySQL 连接测试成功');
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
 }
 
 /**
@@ -820,25 +912,40 @@ async function configureDatabase() {
  *   4. 如选择 Nginx 但未安装，提供安装选项
  *   5. 配置前端端口和域名
  */
-async function configureServices() {
+async function configureServices(cmdArgs) {
   log.step('服务配置');
 
-  // 1. 后端端口配置
-  config.backendPort = await ask('后端服务端口', '8000');
+  if (cmdArgs?.nonInteractive && cmdArgs?.backendPort) {
+    config.backendPort = cmdArgs.backendPort;
+    log.info(`使用命令行参数: 后端端口 = ${config.backendPort}`);
+  } else if (cmdArgs?.nonInteractive) {
+    config.backendPort = '8000';
+    log.info('使用默认配置: 后端端口 = 8000');
+  } else {
+    config.backendPort = await ask('后端服务端口', '8000');
+  }
 
-  // 2. 运行环境选择
-  config.nodeEnv = await select('选择运行环境：', [
-    { label: 'production（生产模式，性能优化，推荐正式部署）', value: 'production' },
-    { label: 'development（开发模式，详细日志，便于调试）', value: 'development' }
-  ]);
+  if (cmdArgs?.nonInteractive) {
+    config.nodeEnv = 'production';
+    log.info('使用默认配置: 运行环境 = production');
+  } else {
+    config.nodeEnv = await select('选择运行环境：', [
+      { label: 'production（生产模式，性能优化，推荐正式部署）', value: 'production' },
+      { label: 'development（开发模式，详细日志，便于调试）', value: 'development' }
+    ]);
+  }
 
-  // 3. 前端部署方式选择
-  config.frontendDeploy = await select('前端部署方式：', [
-    { label: 'Nginx（性能最优，推荐生产环境）', value: 'nginx' },
-    { label: 'PM2 serve（简单快捷，无需额外安装）', value: 'pm2' }
-  ]);
+  if (cmdArgs?.nonInteractive || cmdArgs?.skipNginx) {
+    config.frontendDeploy = 'pm2';
+    config.frontendPort = '3000';
+    log.info('使用默认配置: 前端部署 = PM2 serve (端口 3000)');
+  } else {
+    config.frontendDeploy = await select('前端部署方式：', [
+      { label: 'Nginx（性能最优，推荐生产环境）', value: 'nginx' },
+      { label: 'PM2 serve（简单快捷，无需额外安装）', value: 'pm2' }
+    ]);
+  }
 
-  // 3. 如果选择 Nginx，检查是否已安装
   if (config.frontendDeploy === 'nginx') {
     const nginxInstalled = isNginxInstalled();
 
@@ -846,55 +953,54 @@ async function configureServices() {
       log.warning('未检测到 Nginx 安装');
 
       if (process.platform === 'win32') {
-        // Windows 下询问是否自动安装
-        const autoInstall = await ask('是否自动下载并安装 Nginx? (Y/n)', 'Y');
-        if (autoInstall.toLowerCase() === 'y') {
-          await autoInstallNginx();
-        } else {
-          log.info('已跳过自动安装，请手动安装 Nginx 后启动服务');
-          console.log(`  下载地址: ${colors.cyan}https://nginx.org/en/download.html${colors.reset}`);
-          console.log(`  安装路径建议: ${colors.cyan}C:/nginx${colors.reset}`);
+        if (!cmdArgs?.nonInteractive) {
+          const autoInstall = await ask('是否自动下载并安装 Nginx? (Y/n)', 'Y');
+          if (autoInstall.toLowerCase() === 'y') {
+            await autoInstallNginx();
+          } else {
+            log.info('已跳过自动安装，请手动安装 Nginx 后启动服务');
+            console.log(`  下载地址: ${colors.cyan}https://nginx.org/en/download.html${colors.reset}`);
+            console.log(`  安装路径建议: ${colors.cyan}C:/nginx${colors.reset}`);
+          }
         }
       } else if (process.platform === 'linux') {
-        // Linux 下询问是否自动安装
-        const autoInstall = await ask('是否自动安装 Nginx? (Y/n)', 'Y');
-        if (autoInstall.toLowerCase() === 'y') {
-          const installed = await autoInstallNginxLinux();
-          if (!installed) {
-            log.error('Nginx 自动安装失败');
-            log.info('请手动安装后重新运行脚本');
+        if (!cmdArgs?.nonInteractive) {
+          const autoInstall = await ask('是否自动安装 Nginx? (Y/n)', 'Y');
+          if (autoInstall.toLowerCase() === 'y') {
+            const installed = await autoInstallNginxLinux();
+            if (!installed) {
+              log.error('Nginx 自动安装失败');
+              log.info('请手动安装后重新运行脚本');
+              showNginxInstallGuideLinux();
+              process.exit(1);
+            }
+          } else {
+            log.info('已跳过自动安装');
             showNginxInstallGuideLinux();
-            process.exit(1);
-          }
-        } else {
-          log.info('已跳过自动安装');
-          showNginxInstallGuideLinux();
-          const continueDeploy = await ask('是否继续部署（后端将启动，前端需手动配置 Nginx）? (Y/n)', 'Y');
-          if (continueDeploy.toLowerCase() !== 'y') {
-            log.info('已取消部署，请安装 Nginx 后重新运行');
-            process.exit(0);
+            const continueDeploy = await ask('是否继续部署（后端将启动，前端需手动配置 Nginx）? (Y/n)', 'Y');
+            if (continueDeploy.toLowerCase() !== 'y') {
+              log.info('已取消部署，请安装 Nginx 后重新运行');
+              process.exit(0);
+            }
           }
         }
       } else {
-        // macOS 下提供安装命令
         log.info('请使用 Homebrew 安装 Nginx：');
         console.log(`  ${colors.cyan}brew install nginx${colors.reset}`);
-        console.log(`\n安装完成后，请重新运行此脚本继续部署。\n`);
-
-        const continueDeploy = await ask('是否继续部署（后端将启动，前端需手动配置 Nginx）? (Y/n)', 'Y');
-        if (continueDeploy.toLowerCase() !== 'y') {
-          log.info('已取消部署，请安装 Nginx 后重新运行');
-          process.exit(0);
-        }
       }
     }
 
-    // Nginx 端口和域名配置
-    config.frontendPort = await ask('Nginx 监听端口', '80');
-    config.domain = await ask('域名（没有则填localhost）', 'localhost');
+    if (!cmdArgs?.nonInteractive) {
+      config.frontendPort = await ask('Nginx 监听端口', '80');
+      config.domain = await ask('域名（没有则填localhost）', 'localhost');
+    } else {
+      config.frontendPort = '80';
+      config.domain = 'localhost';
+    }
   } else {
-    // PM2 serve 端口配置
-    config.frontendPort = await ask('前端服务端口', '3000');
+    if (!cmdArgs?.nonInteractive) {
+      config.frontendPort = await ask('前端服务端口', '3000');
+    }
   }
 
   log.divider();
@@ -1658,47 +1764,133 @@ function printManagementCommands() {
  *   10. 输出管理命令
  */
 async function main() {
-  // 显示欢迎信息
+  installStartTime = Date.now();
+  const cmdArgs = parseArgs();
+
+  if (cmdArgs.help) {
+    showHelp();
+    return;
+  }
+
+  initLogFile();
+
   console.log(`
 ${colors.bright}${colors.cyan}
 ╔══════════════════════════════════════════════════════════╗
-║     IDC设备管理系统 - 交互式安装部署脚本                    ║
+║     IDC设备管理系统 - 安装部署脚本 v${SCRIPT_VERSION}                  ║
 ║     Interactive Installation & Deployment Script          ║
 ╚══════════════════════════════════════════════════════════╝
 ${colors.reset}`);
 
+  if (cmdArgs.nonInteractive) {
+    log.info('运行模式: 非交互式（使用默认配置）');
+  }
+
   try {
-    // 步骤1：环境检测
     await checkEnvironment();
+    await configureDatabase(cmdArgs);
+    await configureServices(cmdArgs);
+    
+    if (!cmdArgs.nonInteractive) {
+      await confirmConfiguration();
+    }
 
-    // 步骤2：交互式配置
-    await configureDatabase();
-    await configureServices();
-    await confirmConfiguration();
-
-    // 步骤3：生成配置文件
     generateBackendEnv();
     generatePM2Config();
     generateNginxConfig();
 
-    // 步骤4：安装和部署
     await installDependencies();
     await initDatabase();
-    await buildFrontend();
+    
+    if (!cmdArgs.skipBuild) {
+      await buildFrontend();
+    } else {
+      log.info('已跳过前端构建');
+    }
+    
     await startServices();
-
-    // 步骤5：输出管理命令
-    printManagementCommands();
+    await healthCheck();
+    printSummary();
 
   } catch (error) {
     log.error(`部署失败: ${error.message}`);
     console.error(error);
     process.exit(1);
   } finally {
-    // 关闭 readline 接口
     rl.close();
+    closeLogFile();
   }
 }
 
-// 运行主函数
+async function healthCheck() {
+  log.step('健康检查');
+  log.subStep('检查后端服务状态...');
+  
+  const maxRetries = 5;
+  const retryDelay = 3000;
+  
+  for (let i = 1; i <= maxRetries; i++) {
+    try {
+      const result = execSync('curl -s -o /dev/null -w "%{http_code}" http://localhost:' + config.backendPort + '/health 2>nul || echo "000"', {
+        encoding: 'utf8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+        timeout: 5000
+      }).trim();
+      
+      if (result === '200') {
+        log.success('后端服务健康检查通过');
+        return { success: true };
+      }
+      
+      if (i < maxRetries) {
+        log.subStep(`第 ${i} 次检查失败 (HTTP ${result})，${retryDelay/1000}秒后重试...`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+      }
+    } catch (error) {
+      if (i < maxRetries) {
+        log.subStep(`第 ${i} 次检查失败，${retryDelay/1000}秒后重试...`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+      }
+    }
+  }
+
+  log.warning('健康检查未通过，请手动验证服务状态');
+  return { success: false };
+}
+
+function printSummary() {
+  const duration = ((Date.now() - installStartTime) / 1000).toFixed(1);
+  
+  console.log(`
+${colors.bright}${colors.magenta}
+╔══════════════════════════════════════════════════════════╗
+║                    安装摘要                               ║
+╚══════════════════════════════════════════════════════════╝${colors.reset}`);
+
+  console.log(`\n  ${colors.cyan}安装耗时:${colors.reset} ${duration} 秒`);
+  console.log(`  ${colors.cyan}数据库类型:${colors.reset} ${config.dbType}`);
+  console.log(`  ${colors.cyan}后端端口:${colors.reset} ${config.backendPort}`);
+  console.log(`  ${colors.cyan}前端部署:${colors.reset} ${config.frontendDeploy}`);
+  
+  console.log(`\n${colors.bright}服务管理命令：${colors.reset}`);
+  console.log(`  ${colors.cyan}pm2 status${colors.reset}              查看服务状态`);
+  console.log(`  ${colors.cyan}pm2 logs idc-backend${colors.reset}      查看后端日志`);
+  console.log(`  ${colors.cyan}pm2 restart idc-backend${colors.reset}   重启后端`);
+  console.log(`  ${colors.cyan}pm2 stop idc-backend${colors.reset}      停止后端`);
+  
+  console.log(`\n${colors.bright}访问地址：${colors.reset}`);
+  console.log(`  后端API: ${colors.cyan}http://localhost:${config.backendPort}/api${colors.reset}`);
+  if (config.frontendDeploy === 'nginx') {
+    console.log(`  前端页面: ${colors.cyan}http://${config.domain}:${config.frontendPort}${colors.reset}`);
+  } else {
+    console.log(`  前端页面: ${colors.cyan}http://localhost:${config.frontendPort}${colors.reset}`);
+  }
+  
+  console.log(`\n${colors.bright}更新升级：${colors.reset}`);
+  console.log(`  ${colors.cyan}node update.js${colors.reset}            一键更新`);
+  
+  log.divider();
+  log.success('安装部署完成！');
+}
+
 main();

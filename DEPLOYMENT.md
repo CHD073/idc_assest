@@ -25,6 +25,8 @@
 
 我们提供了交互式安装脚本，自动完成环境检测、依赖安装、数据库初始化和服务启动。
 
+#### Linux 用户（支持自动安装 Node.js）
+
 ```bash
 # 克隆项目（选择其一）
 # Gitee（国内推荐）
@@ -33,36 +35,63 @@ git clone https://gitee.com/zhang96110/idc_assest.git
 git clone https://github.com/gituib/idc_assest.git
 cd idc_assest
 
-#如果没安装nodejs需要先安装
+# 方式1：使用 Shell 引导脚本（推荐，无需预装 Node.js）
+chmod +x install.sh && ./install.sh
 
-**Ubuntu/Debian:**
-```bash
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-sudo apt-get install -y nodejs
+# 方式2：一键安装（从远程）
+curl -fsSL https://gitee.com/zhang96110/idc_assest/raw/main/install.sh | bash
 ```
 
-**CentOS/RHEL/Fedora:**
-```bash
-curl -fsSL https://rpm.nodesource.com/setup_20.x | sudo bash -
-sudo yum install -y nodejs
+**Shell 脚本功能：**
+- ✅ 自动检测 Linux 发行版（Ubuntu/Debian/CentOS/Arch）
+- ✅ 自动安装 Node.js 20.x（使用 NodeSource 或 nvm）
+- ✅ 自动安装系统依赖（git、curl 等）
+- ✅ 调用 install.js 完成后续安装
 
-系统已经安装了nodejs的可以直接执行一键安装脚本
+#### Windows 用户
 
-# 运行部署脚本
-npm run deploy
-# 或
+```powershell
+# 克隆项目
+git clone https://gitee.com/zhang96110/idc_assest.git
+cd idc_assest
+
+# 运行安装脚本（需要先安装 Node.js）
 node install.js
+
+# 或使用 npm 命令
+npm run deploy
+```
+
+#### 非交互式安装（快速部署）
+
+```bash
+# 使用默认配置快速安装
+node install.js -y                    # 交互式安装
+
+# 指定数据库类型
+node install.js -y --db=mysql         # 使用 MySQL
+node install.js -y --db=sqlite        # 使用 SQLite（默认）
+
+# 指定端口
+node install.js -y --port=3000        # 后端端口 3000
+
+# 跳过前端构建
+node install.js -y --skip-build
 ```
 
 **脚本功能：**
 - ✅ 自动检测 Node.js、npm、PM2、Nginx
-- ✅ Linux 系统支持自动安装 Node.js（交互式）
+- ✅ **Linux 自动安装 Node.js**（Ubuntu/Debian/CentOS/Arch）
+- ✅ **MySQL 连接测试**（配置后自动验证）
+- ✅ **安装后健康检查**（验证服务是否正常）
 - ✅ 交互式配置数据库（SQLite/MySQL）
+- ✅ 交互式选择运行环境（development/production）
 - ✅ 交互式选择前端部署方式（Nginx/PM2 serve）
 - ✅ 自动安装项目依赖
 - ✅ 自动初始化数据库
 - ✅ 自动构建前端项目
 - ✅ 使用 PM2 启动和管理服务
+- ✅ 日志持久化保存
 
 ---
 
@@ -775,13 +804,37 @@ time curl -o /dev/null -s -w "%{http_code}\n" http://localhost:8000/health
 
 ## 更新升级
 
-### 方式一：一键更新脚本（推荐）
+### 方式一：一键更新脚本（推荐）⭐
 
 ```bash
-npm run update
+# 交互式更新
+node update.js
+
+# 查看帮助
+node update.js --help
+
+# 模拟运行（不执行实际操作）
+node update.js --dry-run
+
+# 跳过某些步骤
+node update.js --skip-git        # 跳过 Git 拉取
+node update.js --skip-backup     # 跳过数据库备份
+node update.js --skip-migrate    # 跳过数据库迁移
+node update.js --skip-build      # 跳过前端构建
+node update.js --skip-deps       # 跳过依赖安装
+node update.js --skip-restart    # 跳过服务重启
+
+# 强制执行（忽略锁文件）
+node update.js --force
 ```
 
-功能：自动备份 → 拉取代码 → 更新依赖 → 重建前端 → 重启服务
+**智能检测功能：**
+- ✅ **依赖安装智能跳过** - 检测 package.json 变化，无变化则跳过
+- ✅ **前端构建智能跳过** - 检测源码变化，无变化则跳过
+- ✅ **数据库自动备份** - 更新前自动备份，支持回滚
+- ✅ **健康检查验证** - 更新后验证服务是否正常
+- ✅ **日志持久化** - 更新日志保存到 `logs/update_*.log`
+- ✅ **锁机制** - 防止多个更新进程同时运行
 
 ### 方式二：手动更新
 
@@ -876,6 +929,61 @@ module.exports = {
     log_date_format: 'YYYY-MM-DD HH:mm:ss Z'
   }]
 };
+```
+
+---
+
+## 卸载系统
+
+### 方式一：一键卸载脚本（推荐）⭐
+
+```bash
+# 交互式卸载
+node uninstall.js
+
+# 查看帮助
+node uninstall.js --help
+
+# 强制卸载（无需确认）
+node uninstall.js --force
+
+# 卸载前自动备份
+node uninstall.js --backup
+
+# 跳过某些步骤
+node uninstall.js --skip-db     # 跳过数据库删除
+node uninstall.js --skip-deps   # 跳过依赖删除
+```
+
+**卸载功能：**
+- ✅ 停止并删除 PM2 服务
+- ✅ 清理 Nginx 配置
+- ✅ 删除生成的配置文件
+- ✅ 可选删除数据库文件
+- ✅ 可选删除 node_modules
+- ✅ 卸载前自动备份
+- ✅ 日志持久化保存
+
+### 方式二：手动卸载
+
+```bash
+# 1. 停止服务
+pm2 stop idc-backend
+pm2 delete idc-backend
+pm2 save
+
+# 2. 删除配置文件
+rm backend/.env
+rm deploy/ecosystem.config.js
+rm deploy/nginx-idc.conf
+
+# 3. 删除数据库（可选）
+rm backend/idc_management.db
+
+# 4. 删除依赖（可选）
+rm -rf backend/node_modules
+rm -rf frontend/node_modules
+rm -rf frontend/dist
 ```
 
 ---
@@ -996,7 +1104,8 @@ idc_assest/
 ├── docs/                # 项目文档
 │   ├── api/             # 接口文档
 │   └── images/          # 文档图片
-├── install.js           # 交互式安装脚本 ⭐
+├── install.sh           # Linux 安装引导脚本（Shell）⭐
+├── install.js           # 交互式安装脚本（Node.js）⭐
 ├── update.js            # 一键更新脚本 ⭐
 ├── uninstall.js         # 卸载脚本
 ├── check.js             # 环境检查脚本

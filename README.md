@@ -154,7 +154,9 @@
 
 ### 方式一：一键部署脚本（推荐）⭐
 
-我们提供了交互式安装脚本，自动完成所有部署步骤：
+我们提供了交互式安装脚本，自动完成所有部署步骤。
+
+#### Linux 用户（支持自动安装 Node.js）
 
 ```bash
 # 克隆项目（选择其一）
@@ -164,15 +166,49 @@ git clone https://gitee.com/zhang96110/idc_assest.git
 git clone https://github.com/gituib/idc_assest.git
 cd idc_assest
 
-# 运行交互式安装脚本
-npm run deploy
-# 或
+# 方式1：使用 Shell 引导脚本（推荐，无需预装 Node.js）
+chmod +x install.sh && ./install.sh
+
+# 方式2：一键安装（从远程）
+curl -fsSL https://gitee.com/zhang96110/idc_assest/raw/main/install.sh | bash
+```
+
+#### Windows 用户
+
+```powershell
+# 克隆项目
+git clone https://gitee.com/zhang96110/idc_assest.git
+cd idc_assest
+
+# 运行安装脚本（需要先安装 Node.js）
 node install.js
+
+# 或使用 npm 命令
+npm run deploy
+```
+
+#### 非交互式安装（快速部署）
+
+```bash
+# 使用默认配置快速安装
+node install.js -y                    # 交互式安装
+
+# 指定数据库类型
+node install.js -y --db=mysql         # 使用 MySQL
+node install.js -y --db=sqlite        # 使用 SQLite（默认）
+
+# 指定端口
+node install.js -y --port=3000        # 后端端口 3000
+
+# 跳过前端构建
+node install.js -y --skip-build
 ```
 
 **脚本功能：**
 - ✅ 自动检测 Node.js、npm、PM2、Nginx
-- ✅ **Linux 支持自动安装 Node.js**（交互式）
+- ✅ **Linux 自动安装 Node.js**（Ubuntu/Debian/CentOS/Arch）
+- ✅ **MySQL 连接测试**（配置后自动验证）
+- ✅ **安装后健康检查**（验证服务是否正常）
 - ✅ 交互式配置数据库（SQLite/MySQL）
 - ✅ 交互式选择运行环境（development/production）
 - ✅ 交互式选择前端部署方式（Nginx/PM2 serve）
@@ -180,6 +216,7 @@ node install.js
 - ✅ 自动初始化数据库
 - ✅ 自动构建前端项目
 - ✅ 使用 PM2 启动和管理服务
+- ✅ 日志持久化保存
 
 ### 方式二：手动安装
 
@@ -585,7 +622,8 @@ jigui/
 │   └── USER_GUIDE.md             # 用户指南
 ├── scripts/                       # 项目脚本
 │   └── frontend-manager.js        # 前端管理脚本
-├── install.js                     # 交互式安装脚本 ⭐
+├── install.sh                     # Linux 安装引导脚本（Shell）⭐
+├── install.js                     # 交互式安装脚本（Node.js）⭐
 ├── update.js                      # 一键更新脚本 ⭐
 ├── uninstall.js                   # 卸载脚本
 ├── package.json                   # 项目根依赖
@@ -605,10 +643,34 @@ jigui/
 ### 一键更新（推荐）⭐
 
 ```bash
-npm run update
+# 交互式更新
+node update.js
+
+# 查看帮助
+node update.js --help
+
+# 模拟运行（不执行实际操作）
+node update.js --dry-run
+
+# 跳过某些步骤
+node update.js --skip-git        # 跳过 Git 拉取
+node update.js --skip-backup     # 跳过数据库备份
+node update.js --skip-migrate    # 跳过数据库迁移
+node update.js --skip-build      # 跳过前端构建
+node update.js --skip-deps       # 跳过依赖安装
+node update.js --skip-restart    # 跳过服务重启
+
+# 强制执行（忽略锁文件）
+node update.js --force
 ```
 
-功能：自动备份 → 拉取代码 → 更新依赖 → 重建前端 → 重启服务
+**智能检测功能：**
+- ✅ **依赖安装智能跳过** - 检测 package.json 变化，无变化则跳过
+- ✅ **前端构建智能跳过** - 检测源码变化，无变化则跳过
+- ✅ **数据库自动备份** - 更新前自动备份，支持回滚
+- ✅ **健康检查验证** - 更新后验证服务是否正常
+- ✅ **日志持久化** - 更新日志保存到 `logs/update_*.log`
+- ✅ **锁机制** - 防止多个更新进程同时运行
 
 ### 手动更新
 
@@ -625,6 +687,39 @@ cd ../frontend && npm install && npm run build
 # 4. 重启服务
 pm2 restart idc-backend
 ```
+
+---
+
+## 卸载系统
+
+### 一键卸载（推荐）⭐
+
+```bash
+# 交互式卸载
+node uninstall.js
+
+# 查看帮助
+node uninstall.js --help
+
+# 强制卸载（无需确认）
+node uninstall.js --force
+
+# 卸载前自动备份
+node uninstall.js --backup
+
+# 跳过某些步骤
+node uninstall.js --skip-db     # 跳过数据库删除
+node uninstall.js --skip-deps   # 跳过依赖删除
+```
+
+**卸载功能：**
+- ✅ 停止并删除 PM2 服务
+- ✅ 清理 Nginx 配置
+- ✅ 删除生成的配置文件
+- ✅ 可选删除数据库文件
+- ✅ 可选删除 node_modules
+- ✅ 卸载前自动备份
+- ✅ 日志持久化保存
 
 ---
 
