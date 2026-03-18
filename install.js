@@ -205,6 +205,7 @@ function askPassword(question) {
     
     let password = '';
     const stdin = process.stdin;
+    const stdout = process.stdout;
     
     const cleanup = () => {
       if (stdin.isTTY) {
@@ -216,41 +217,36 @@ function askPassword(question) {
     };
     
     const onData = (char) => {
-      const c = char;
+      const code = char.charCodeAt(0);
       
-      switch (c) {
-        case '\n':
-        case '\r':
-        case '\u0004':
-          cleanup();
-          console.log();
-          resolve(password);
-          break;
-        case '\u0003':
-          cleanup();
-          console.log('\n已取消');
-          process.exit(0);
-          break;
-        case '\u007F':
-        case '\b':
-          if (password.length > 0) {
-            password = password.slice(0, -1);
-            process.stdout.write('\b \b');
-          }
-          break;
-        default:
-          password += c;
-          process.stdout.write('*');
-          break;
+      if (code === 10 || code === 13) {
+        cleanup();
+        stdout.write('\n');
+        resolve(password);
+      } else if (code === 3) {
+        cleanup();
+        stdout.write('\n已取消\n');
+        process.exit(0);
+      } else if (code === 127 || code === 8) {
+        if (password.length > 0) {
+          password = password.slice(0, -1);
+          stdout.write('\b \b');
+        }
+      } else if (code >= 32) {
+        password += char;
+        stdout.write('*');
       }
     };
     
     if (stdin.isTTY) {
       stdin.setRawMode(true);
+      stdin.resume();
+      stdin.on('data', onData);
+    } else {
+      rl.question('', (answer) => {
+        resolve(answer.trim());
+      });
     }
-    stdin.setEncoding('utf8');
-    stdin.on('data', onData);
-    stdin.resume();
   });
 }
 
