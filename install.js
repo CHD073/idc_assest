@@ -209,7 +209,7 @@ function askPassword(question, requireConfirm = false) {
     
     rl2.question(`${question}: `, { silent: true }, (password1) => {
       if (requireConfirm) {
-        rl2.question('请再次输入密码确认: `, { silent: true }, (password2) => {
+        rl2.question('请再次输入密码确认: ', { silent: true }, (password2) => {
           rl2.close();
           if (password1 === password2) {
             resolve(password1);
