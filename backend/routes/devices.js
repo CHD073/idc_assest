@@ -31,7 +31,7 @@ Rack.hasMany(Device, { foreignKey: 'rackId' });
 
 router.get('/', validateQuery(queryDeviceSchema), async (req, res) => {
   try {
-    const { keyword, status, type, rackId, page = 1, pageSize = 10 } = req.query;
+    const { keyword, status, type, rackId, roomId, page = 1, pageSize = 10 } = req.query;
     const offset = (page - 1) * pageSize;
 
     // 构建查询条件
@@ -99,6 +99,11 @@ router.get('/', validateQuery(queryDeviceSchema), async (req, res) => {
     // 机柜筛选（用于机柜可视化功能）
     if (rackId) {
       where.rackId = rackId;
+    }
+
+    // 机房筛选 - 通过机柜关联查询
+    if (roomId && roomId !== 'all') {
+      where['$Rack.roomId$'] = roomId;
     }
 
     // 执行查询 - 优化：使用 JOIN 避免 N+1 查询问题

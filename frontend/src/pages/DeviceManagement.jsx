@@ -87,6 +87,8 @@ function DeviceManagement() {
   const [keyword, setKeyword] = useState('');
   const [status, setStatus] = useState('all');
   const [type, setType] = useState('all');
+  const [roomId, setRoomId] = useState('all');
+  const [rackId, setRackId] = useState('all');
   const [searchForm] = Form.useForm();
 
   const [pagination, setPagination] = useState({
@@ -133,6 +135,8 @@ function DeviceManagement() {
           keyword: debouncedKeyword || undefined,
           status: status !== 'all' ? status : undefined,
           type: type !== 'all' ? type : undefined,
+          roomId: roomId !== 'all' ? roomId : undefined,
+          rackId: rackId !== 'all' ? rackId : undefined,
         };
 
         const response = await axios.get('/api/devices', { params });
@@ -149,7 +153,7 @@ function DeviceManagement() {
         setLoading(false);
       }
     },
-    [debouncedKeyword, status, type]
+    [debouncedKeyword, status, type, roomId, rackId]
   );
 
   const fetchDeviceFields = async () => {
@@ -271,6 +275,8 @@ function DeviceManagement() {
     setKeyword(values.keyword || '');
     setStatus(values.status || 'all');
     setType(values.type || 'all');
+    setRoomId(values.roomId || 'all');
+    setRackId(values.rackId || 'all');
 
     setPagination((prev) => ({ ...prev, current: 1 }));
 
@@ -283,6 +289,8 @@ function DeviceManagement() {
     setKeyword('');
     setStatus('all');
     setType('all');
+    setRoomId('all');
+    setRackId('all');
     searchForm.resetFields();
 
     setTimeout(() => setSearching(false), 300);
@@ -916,6 +924,43 @@ function DeviceManagement() {
               <Option value="router">路由器</Option>
               <Option value="storage">存储设备</Option>
               <Option value="other">其他设备</Option>
+            </Select>
+          </Form.Item>
+
+          <Form.Item name="roomId" style={{ margin: 0 }}>
+            <Select
+              value={roomId}
+              onChange={(value) => {
+                setRoomId(value);
+                setRackId('all');
+              }}
+              style={{ width: '140px', borderRadius: designTokens.borderRadius.medium }}
+            >
+              <Option value="all">所有机房</Option>
+              {rooms.map((room) => (
+                <Option key={room.roomId} value={room.roomId}>
+                  {room.name}
+                </Option>
+              ))}
+            </Select>
+          </Form.Item>
+
+          <Form.Item name="rackId" style={{ margin: 0 }}>
+            <Select
+              value={rackId}
+              onChange={setRackId}
+              style={{ width: '140px', borderRadius: designTokens.borderRadius.medium }}
+              showSearch
+              optionFilterProp="children"
+            >
+              <Option value="all">所有机柜</Option>
+              {racks
+                .filter((rack) => roomId === 'all' || rack.roomId === roomId)
+                .map((rack) => (
+                  <Option key={rack.rackId} value={rack.rackId}>
+                    {rack.name}
+                  </Option>
+                ))}
             </Select>
           </Form.Item>
 

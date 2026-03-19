@@ -18,6 +18,8 @@ import {
   DatePicker,
   Checkbox,
   Switch,
+  Tooltip,
+  Badge,
 } from 'antd';
 import {
   CloudServerOutlined,
@@ -30,6 +32,8 @@ import {
   SettingOutlined,
   FullscreenOutlined,
   EyeOutlined,
+  LeftOutlined,
+  RightOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -74,7 +78,7 @@ const Rack3DVisualization = () => {
 
   const [selectedRoom, setSelectedRoom] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [isRackInfoCollapsed, setIsRackInfoCollapsed] = useState(false); // Rack Info Card collapsed state
+  const [isRackInfoCollapsed, setIsRackInfoCollapsed] = useState(false);
 
   // Edit Modal State
   const [modalVisible, setModalVisible] = useState(false);
@@ -343,7 +347,7 @@ const Rack3DVisualization = () => {
   useEffect(() => {
     if (selectedRack?.rackId) {
       fetchDevices(selectedRack.rackId);
-      setSelectedDevice(null); // Reset selection on rack change
+      setSelectedDevice(null);
     }
   }, [selectedRack, fetchDevices]);
 
@@ -360,6 +364,40 @@ const Rack3DVisualization = () => {
     });
     return Array.from(roomMap.values());
   }, [racks]);
+
+  // 计算机柜统计数据的 useMemo
+  const rackStats = useMemo(() => {
+    if (!selectedRack || !devices.length) {
+      return {
+        usedU: 0,
+        usagePercent: 0,
+        totalPower: 0,
+        availableU: selectedRack?.height || 0,
+      };
+    }
+
+    // 计算已用U位（考虑设备高度）
+    const usedU = devices.reduce((sum, device) => sum + (device.height || 1), 0);
+    
+    // 计算总功率
+    const totalPower = devices.reduce((sum, device) => {
+      const power = parseFloat(device.powerConsumption) || 0;
+      return sum + power;
+    }, 0);
+
+    // 机柜总高度
+    const totalHeight = selectedRack.height || 45;
+    
+    // 可用U位
+    const availableU = totalHeight - usedU;
+
+    return {
+      usedU,
+      usagePercent: totalHeight > 0 ? Math.round((usedU / totalHeight) * 100) : 0,
+      totalPower,
+      availableU,
+    };
+  }, [selectedRack, devices]);
 
   const racksInSelectedRoom = useMemo(() => {
     if (!selectedRoom) return [];
@@ -444,6 +482,20 @@ const Rack3DVisualization = () => {
     [selectedDevice, fetchDeviceCables]
   );
 
+  const handlePrevRack = () => {
+    if (racksInSelectedRoom.length <= 1) return;
+    const currentIndex = racksInSelectedRoom.findIndex(r => r.rackId === selectedRack?.rackId);
+    const prevIndex = currentIndex > 0 ? currentIndex - 1 : racksInSelectedRoom.length - 1;
+    setSelectedRack(racksInSelectedRoom[prevIndex]);
+  };
+
+  const handleNextRack = () => {
+    if (racksInSelectedRoom.length <= 1) return;
+    const currentIndex = racksInSelectedRoom.findIndex(r => r.rackId === selectedRack?.rackId);
+    const nextIndex = currentIndex < racksInSelectedRoom.length - 1 ? currentIndex + 1 : 0;
+    setSelectedRack(racksInSelectedRoom[nextIndex]);
+  };
+
   return (
     <Layout
       style={{ height: '100vh', overflow: 'hidden', background: '#000', position: 'relative' }}
@@ -468,7 +520,7 @@ const Rack3DVisualization = () => {
             type="text"
             icon={<ArrowLeftOutlined style={{ color: 'rgba(255,255,255,0.8)' }} />}
             onClick={() => navigate('/')}
-            style={{ marginRight: 16 }}
+            style={{ marginRight: 8 }}
             className="hover-bright"
           />
           <div
@@ -499,7 +551,7 @@ const Rack3DVisualization = () => {
         </div>
         <Space size="middle">
           <Select
-            placeholder="选择机房"
+            placeholder="搜索机房"
             style={{ width: 180 }}
             value={selectedRoom}
             onChange={val => {
@@ -513,6 +565,10 @@ const Rack3DVisualization = () => {
             variant="borderless"
             popupMatchSelectWidth={false}
             className="glass-select"
+            showSearch
+            filterOption={(input, option) =>
+              (option?.children?.toString() || '').toLowerCase().includes(input.toLowerCase())
+            }
           >
             {rooms.map(room => (
               <Option key={room.key} value={room.key}>
@@ -520,14 +576,29 @@ const Rack3DVisualization = () => {
               </Option>
             ))}
           </Select>
+          <Button
+            type="text"
+            icon={<LeftOutlined />}
+            onClick={handlePrevRack}
+            disabled={!selectedRoom || racksInSelectedRoom.length <= 1}
+            className="hover-bright"
+            style={{
+              color: 'rgba(255,255,255,0.9)',
+              borderRadius: '6px',
+            }}
+          />
           <Select
-            placeholder="选择机柜"
+            placeholder="搜索机柜"
             style={{ width: 180 }}
             value={selectedRack?.rackId}
             onChange={val => setSelectedRack(racks.find(r => r.rackId === val))}
             disabled={!selectedRoom}
             variant="borderless"
             className="glass-select"
+            showSearch
+            filterOption={(input, option) =>
+              (option?.children?.toString() || '').toLowerCase().includes(input.toLowerCase())
+            }
           >
             {racksInSelectedRoom.map(rack => (
               <Option key={rack.rackId} value={rack.rackId}>
@@ -535,6 +606,17 @@ const Rack3DVisualization = () => {
               </Option>
             ))}
           </Select>
+          <Button
+            type="text"
+            icon={<RightOutlined />}
+            onClick={handleNextRack}
+            disabled={!selectedRoom || racksInSelectedRoom.length <= 1}
+            className="hover-bright"
+            style={{
+              color: 'rgba(255,255,255,0.9)',
+              borderRadius: '6px',
+            }}
+          />
           <Button
             type="primary"
             ghost
@@ -625,19 +707,100 @@ const Rack3DVisualization = () => {
             border: 1px solid rgba(255, 255, 255, 0.1) !important;
             color: white !important;
             border-radius: 6px !important;
-            transition: all 0.3s;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            padding: 4px 12px !important;
+            height: auto !important;
+            min-height: 32px !important;
+            align-items: center !important;
         }
         .glass-select:hover .ant-select-selector {
             background: rgba(255, 255, 255, 0.15) !important;
             border-color: rgba(255, 255, 255, 0.3) !important;
         }
+        .glass-select.ant-select-focused .ant-select-selector {
+            background: rgba(255, 255, 255, 0.12) !important;
+            border-color: #3b82f6 !important;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15), 0 0 12px rgba(59, 130, 246, 0.1) !important;
+        }
         .glass-select .ant-select-selection-item, 
         .glass-select .ant-select-selection-placeholder {
             color: rgba(255, 255, 255, 0.9) !important;
-            font-size: 13px;
+            font-size: 13px !important;
+            line-height: 1.5 !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            position: relative !important;
+            z-index: 1 !important;
+            flex: 0 1 auto !important;
+        }
+        .glass-select.ant-select-show-search .ant-select-selection-item,
+        .glass-select.ant-select-show-search .ant-select-selection-placeholder {
+            position: absolute !important;
+            left: 0 !important;
+            top: 50% !important;
+            transform: translateY(-50%) !important;
+            width: 100% !important;
+            padding-right: 24px !important;
+        }
+        .glass-select.ant-select-show-search.ant-select-focused .ant-select-selection-item,
+        .glass-select.ant-select-show-search.ant-select-focused .ant-select-selection-placeholder {
+            display: none !important;
+        }
+        .glass-select .ant-select-selection-wrap {
+            display: flex !important;
+            flex-wrap: nowrap !important;
+            align-items: center !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            max-width: calc(100% - 24px) !important;
+        }
+        .glass-select .ant-select-selection-search {
+            position: absolute !important;
+            left: 0 !important;
+            top: 50% !important;
+            transform: translateY(-50%) !important;
+            width: 100% !important;
+            z-index: 2 !important;
+            display: flex !important;
+            align-items: center !important;
+        }
+        .glass-select .ant-select-selection-search-input {
+            width: 100% !important;
+            min-width: 0 !important;
+            color: white !important;
+            caret-color: #3b82f6 !important;
+            font-size: 13px !important;
+            background: transparent !important;
+            border: none !important;
+            outline: none !important;
+            padding: 0 !important;
+        }
+        .glass-select .ant-select-selection-search-input::placeholder {
+            color: rgba(255, 255, 255, 0.5) !important;
         }
         .glass-select .ant-select-arrow {
             color: rgba(255, 255, 255, 0.6) !important;
+            transition: all 0.3s;
+            position: relative !important;
+            z-index: 1 !important;
+        }
+        .glass-select.ant-select-focused .ant-select-arrow {
+            color: #60a5fa !important;
+            transform: translateY(-50%) scale(1.1);
+        }
+        .glass-select input {
+            color: white !important;
+            caret-color: #3b82f6 !important;
+            font-size: 13px !important;
+            width: 100% !important;
+            min-width: 0 !important;
+        }
+        .glass-select input::placeholder {
+            color: rgba(255, 255, 255, 0.5) !important;
+        }
+        .glass-select.ant-select-open input {
+            caret-color: #60a5fa !important;
         }
         .hover-bright:hover {
             color: white !important;
@@ -645,7 +808,8 @@ const Rack3DVisualization = () => {
         }
       `}</style>
 
-      <Layout>
+      <Layout style={{ marginTop: 64 }}>
+
         <Content style={{ position: 'relative', background: '#ffffff' }}>
           {loading ? (
             <div
@@ -679,17 +843,17 @@ const Rack3DVisualization = () => {
                 <div
                   style={{
                     position: 'absolute',
-                    top: 88, // Moved down to avoid header overlap
-                    left: 24,
-                    background: 'rgba(255, 255, 255, 0.85)', // Slightly more transparent
-                    backdropFilter: 'blur(12px)',
-                    padding: isRackInfoCollapsed ? '12px 16px' : '20px',
-                    borderRadius: '16px',
-                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.08)', // Softer, deeper shadow
-                    width: isRackInfoCollapsed ? 'auto' : '280px',
+                    top: 88,
+                    right: 24,
+                    background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.95) 0%, rgba(30, 41, 59, 0.9) 100%)',
+                    backdropFilter: 'blur(16px)',
+                    padding: isRackInfoCollapsed ? '14px 18px' : '20px',
+                    borderRadius: '20px',
+                    boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.05)',
+                    width: isRackInfoCollapsed ? 'auto' : '300px',
                     zIndex: 5,
-                    border: '1px solid rgba(255, 255, 255, 0.6)',
-                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
                     overflow: 'hidden',
                     cursor: isRackInfoCollapsed ? 'pointer' : 'default',
                   }}
@@ -700,48 +864,67 @@ const Rack3DVisualization = () => {
                     style={{
                       display: 'flex',
                       alignItems: 'center',
-                      marginBottom: isRackInfoCollapsed ? 0 : 16,
+                      marginBottom: isRackInfoCollapsed ? 0 : 20,
                       justifyContent: 'space-between',
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
                       <div
                         style={{
-                          width: 36,
-                          height: 36,
+                          width: 44,
+                          height: 44,
                           background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-                          borderRadius: '10px',
+                          borderRadius: '12px',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
-                          marginRight: 12,
-                          boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)',
+                          marginRight: 14,
+                          boxShadow: '0 6px 20px rgba(59, 130, 246, 0.4)',
                           flexShrink: 0,
-                        }}
-                      >
-                        <CloudServerOutlined style={{ color: 'white', fontSize: 18 }} />
-                      </div>
-                      <div
-                        style={{
-                          opacity: isRackInfoCollapsed ? 0 : 1,
-                          width: isRackInfoCollapsed ? 0 : 'auto',
-                          transition: 'opacity 0.2s',
-                          whiteSpace: 'nowrap',
+                          position: 'relative',
                           overflow: 'hidden',
                         }}
                       >
                         <div
                           style={{
-                            fontSize: '16px',
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            right: 0,
+                            height: '50%',
+                            background: 'linear-gradient(180deg, rgba(255,255,255,0.15) 0%, transparent 100%)',
+                          }}
+                        />
+                        <CloudServerOutlined style={{ color: 'white', fontSize: 22, position: 'relative', zIndex: 1 }} />
+                      </div>
+                      <div
+                        style={{
+                          opacity: isRackInfoCollapsed ? 0 : 1,
+                          width: isRackInfoCollapsed ? 0 : 'auto',
+                          transition: 'opacity 0.3s',
+                          overflow: 'hidden',
+                          flex: 1,
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: '18px',
                             fontWeight: 700,
-                            color: '#1e293b',
+                            color: '#f8fafc',
                             lineHeight: 1.2,
+                            letterSpacing: '0.3px',
                           }}
                         >
                           {selectedRack.name}
                         </div>
-                        <div style={{ fontSize: '12px', color: '#64748b', marginTop: 2 }}>
-                          ID: {selectedRack.rackId}
+                        <div style={{ 
+                          fontSize: '12px', 
+                          color: 'rgba(148, 163, 184, 0.8)', 
+                          marginTop: 4,
+                          fontFamily: 'monospace',
+                          letterSpacing: '0.5px',
+                        }}>
+                          #{selectedRack.rackId}
                         </div>
                       </div>
                     </div>
@@ -754,16 +937,26 @@ const Rack3DVisualization = () => {
                         e.stopPropagation();
                         setIsRackInfoCollapsed(!isRackInfoCollapsed);
                       }}
-                      style={{ color: '#94a3b8', marginLeft: isRackInfoCollapsed ? 8 : 0 }}
+                      style={{ 
+                        color: 'rgba(148, 163, 184, 0.7)',
+                        marginLeft: isRackInfoCollapsed ? 0 : 8,
+                        width: isRackInfoCollapsed ? 44 : 32,
+                        height: isRackInfoCollapsed ? 44 : 32,
+                        borderRadius: isRackInfoCollapsed ? 12 : 8,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.3s',
+                      }}
                     />
                   </div>
 
                   {/* Content Area - Collapsible */}
                   <div
                     style={{
-                      maxHeight: isRackInfoCollapsed ? 0 : '500px',
+                      maxHeight: isRackInfoCollapsed ? 0 : '600px',
                       opacity: isRackInfoCollapsed ? 0 : 1,
-                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                      transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
                       overflow: 'hidden',
                     }}
                   >
@@ -771,87 +964,171 @@ const Rack3DVisualization = () => {
                     <div
                       style={{
                         display: 'grid',
-                        gridTemplateColumns: '1fr 1fr',
-                        gap: 12,
+                        gridTemplateColumns: 'repeat(3, 1fr)',
+                        gap: 10,
                         marginBottom: 16,
                       }}
                     >
                       <div
                         style={{
-                          background: 'rgba(241, 245, 249, 0.6)',
-                          padding: '10px',
-                          borderRadius: '10px',
+                          background: 'rgba(59, 130, 246, 0.1)',
+                          border: '1px solid rgba(59, 130, 246, 0.2)',
+                          padding: '12px 10px',
+                          borderRadius: '12px',
+                          textAlign: 'center',
                         }}
                       >
-                        <div style={{ fontSize: '12px', color: '#64748b', marginBottom: 2 }}>
-                          总高度
-                        </div>
-                        <div style={{ fontSize: '18px', fontWeight: 600, color: '#0f172a' }}>
+                        <div style={{ fontSize: '22px', fontWeight: 700, color: '#60a5fa', lineHeight: 1 }}>
                           {selectedRack.height}
-                          <span style={{ fontSize: '12px', fontWeight: 400, marginLeft: 2 }}>
-                            U
-                          </span>
+                        </div>
+                        <div style={{ fontSize: '10px', color: 'rgba(148, 163, 184, 0.7)', marginTop: 4, fontWeight: 500 }}>
+                          总高度
                         </div>
                       </div>
                       <div
                         style={{
-                          background: 'rgba(241, 245, 249, 0.6)',
-                          padding: '10px',
-                          borderRadius: '10px',
+                          background: 'rgba(16, 185, 129, 0.1)',
+                          border: '1px solid rgba(16, 185, 129, 0.2)',
+                          padding: '12px 10px',
+                          borderRadius: '12px',
+                          textAlign: 'center',
                         }}
                       >
-                        <div style={{ fontSize: '12px', color: '#64748b', marginBottom: 2 }}>
+                        <div style={{ fontSize: '22px', fontWeight: 700, color: '#34d399', lineHeight: 1 }}>
+                          {devices.length}
+                        </div>
+                        <div style={{ fontSize: '10px', color: 'rgba(148, 163, 184, 0.7)', marginTop: 4, fontWeight: 500 }}>
                           设备数
                         </div>
-                        <div style={{ fontSize: '18px', fontWeight: 600, color: '#3b82f6' }}>
-                          {devices.length}
-                          <span style={{ fontSize: '12px', fontWeight: 400, marginLeft: 2 }}>
-                            台
-                          </span>
+                      </div>
+                      <div
+                        style={{
+                          background: 'rgba(245, 158, 11, 0.1)',
+                          border: '1px solid rgba(245, 158, 11, 0.2)',
+                          padding: '12px 10px',
+                          borderRadius: '12px',
+                          textAlign: 'center',
+                        }}
+                      >
+                        <div style={{ fontSize: '22px', fontWeight: 700, color: '#fbbf24', lineHeight: 1 }}>
+                          {Math.round((devices.length / selectedRack.height) * 100)}%
+                        </div>
+                        <div style={{ fontSize: '10px', color: 'rgba(148, 163, 184, 0.7)', marginTop: 4, fontWeight: 500 }}>
+                          负载率
                         </div>
                       </div>
+                    </div>
+
+                    {/* Status Indicators */}
+                    <div
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.03)',
+                        border: '1px solid rgba(255, 255, 255, 0.06)',
+                        borderRadius: '12px',
+                        padding: '14px',
+                        marginBottom: 16,
+                      }}
+                    >
+                      <div style={{ fontSize: '11px', color: 'rgba(148, 163, 184, 0.6)', marginBottom: 12, fontWeight: 600, letterSpacing: '0.5px', textTransform: 'uppercase' }}>
+                        资源监控
+                      </div>
+                      {[
+                        { 
+                          label: 'U位使用', 
+                          value: `${rackStats.usedU}U / ${selectedRack.height}U`, 
+                          status: rackStats.usagePercent > 80 ? 'warning' : 'normal', 
+                          icon: '📊',
+                          subValue: `剩余 ${rackStats.availableU}U`,
+                        },
+                        { 
+                          label: '总功率', 
+                          value: `${rackStats.totalPower.toFixed(1)}kW`, 
+                          status: 'normal', 
+                          icon: '⚡',
+                          subValue: '当前负载',
+                        },
+                        { 
+                          label: '设备数', 
+                          value: `${devices.length} 台`, 
+                          status: 'normal', 
+                          icon: '🖥️',
+                          subValue: `负载率 ${rackStats.usagePercent}%`,
+                        },
+                      ].map((item, i) => (
+                        <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: i < 2 ? 12 : 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <span style={{ fontSize: 16 }}>{item.icon}</span>
+                            <div>
+                              <div style={{ fontSize: '13px', color: 'rgba(226, 232, 240, 0.9)', fontWeight: 500 }}>{item.label}</div>
+                              <div style={{ fontSize: '11px', color: 'rgba(148, 163, 184, 0.6)', marginTop: 2 }}>{item.subValue}</div>
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <span style={{ fontSize: '14px', fontWeight: 700, color: '#f8fafc' }}>{item.value}</span>
+                            <div style={{
+                              width: 8,
+                              height: 8,
+                              borderRadius: '50%',
+                              background: item.status === 'normal' ? '#10b981' : '#f59e0b',
+                              boxShadow: `0 0 8px ${item.status === 'normal' ? 'rgba(16, 185, 129, 0.6)' : 'rgba(245, 158, 11, 0.6)'}`,
+                            }} />
+                          </div>
+                        </div>
+                      ))}
                     </div>
 
                     {/* Guide Section */}
                     <div
                       style={{
-                        marginTop: 16,
-                        paddingTop: 16,
-                        borderTop: '1px solid rgba(0,0,0,0.06)',
+                        background: 'rgba(59, 130, 246, 0.05)',
+                        border: '1px solid rgba(59, 130, 246, 0.1)',
+                        borderRadius: '12px',
+                        padding: '14px',
                       }}
                     >
                       <div
                         style={{
-                          fontSize: '12px',
+                          fontSize: '11px',
                           fontWeight: 600,
-                          color: '#94a3b8',
-                          marginBottom: 8,
+                          color: 'rgba(148, 163, 184, 0.6)',
+                          marginBottom: 10,
                           display: 'flex',
                           alignItems: 'center',
+                          letterSpacing: '0.5px',
+                          textTransform: 'uppercase',
                         }}
                       >
-                        <InfoCircleOutlined style={{ marginRight: 6 }} /> 操作指南
+                        <InfoCircleOutlined style={{ marginRight: 6, fontSize: 12 }} /> 操作指南
                       </div>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                         {[
-                          { icon: '🖱️', text: '左键旋转视图' },
-                          { icon: '🔍', text: '滚轮缩放视图' },
-                          { icon: '👆', text: '点击设备查看详情' },
+                          { icon: '🖱️', text: '左键旋转视图', color: '#3b82f6' },
+                          { icon: '🔍', text: '滚轮缩放视图', color: '#8b5cf6' },
+                          { icon: '👆', text: '点击设备查看详情', color: '#10b981' },
                         ].map((item, i) => (
                           <div
                             key={i}
                             style={{
                               fontSize: '12px',
-                              color: '#475569',
+                              color: 'rgba(226, 232, 240, 0.8)',
                               display: 'flex',
                               alignItems: 'center',
-                              background: 'rgba(255,255,255,0.5)',
-                              padding: '4px 8px',
-                              borderRadius: '6px',
+                              gap: 10,
+                              padding: '8px 10px',
+                              background: 'rgba(255, 255, 255, 0.02)',
+                              borderRadius: '8px',
+                              transition: 'all 0.2s',
                             }}
                           >
-                            <span style={{ marginRight: 8, opacity: 0.8 }}>{item.icon}</span>
-                            {item.text}
+                            <span style={{ fontSize: 14 }}>{item.icon}</span>
+                            <span style={{ flex: 1 }}>{item.text}</span>
+                            <div style={{
+                              width: 4,
+                              height: 4,
+                              borderRadius: '50%',
+                              background: item.color,
+                              boxShadow: `0 0 6px ${item.color}`,
+                            }} />
                           </div>
                         ))}
                       </div>
