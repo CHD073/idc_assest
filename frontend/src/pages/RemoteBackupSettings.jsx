@@ -296,7 +296,6 @@ const RemoteBackupSettings = () => {
 
       await form.validateFields();
       const values = form.getFieldsValue(true);
-      console.log('[TestConnection] getFieldsValue(true):', JSON.stringify(values));
       const response = await api.post('/backup/remote/test', values);
       
       if (response?.success) {

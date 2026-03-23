@@ -94,6 +94,11 @@ const migrations = [
     name: '设备字段系统标记',
     description: '为 deviceFields 表添加 isSystem 字段，标记系统字段不可删除',
     migrate: migrateDeviceFieldsIsSystem
+  },
+  {
+    name: '设备字段Options配置',
+    description: '确保 deviceFields 表的 type 和 status 字段有正确的 options 配置',
+    migrate: migrateDeviceFieldsOptions
   }
 ];
 
@@ -149,7 +154,7 @@ async function runMigrations() {
 
 async function getTableColumns(tableName) {
   const dialect = sequelize.getDialect();
-  
+
   if (dialect === 'sqlite') {
     const tableInfo = await sequelize.query(
       `PRAGMA table_info(${tableName})`,
@@ -167,7 +172,7 @@ async function getTableColumns(tableName) {
 
 async function tableExists(tableName) {
   const dialect = sequelize.getDialect();
-  
+
   if (dialect === 'sqlite') {
     const tables = await sequelize.query(
       "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
@@ -185,10 +190,10 @@ async function tableExists(tableName) {
 
 async function addColumnIfNotExists(tableName, columnName, columnDef) {
   const columns = await getTableColumns(tableName);
-  
+
   if (!columns.includes(columnName)) {
     const dialect = sequelize.getDialect();
-    const sql = dialect === 'sqlite' 
+    const sql = dialect === 'sqlite'
       ? `ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${columnDef}`
       : `ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${columnDef}`;
     await sequelize.query(sql);
@@ -276,7 +281,7 @@ async function migrateConsumableLogDecouple() {
 
 async function removeConsumableLogFK() {
   const dialect = sequelize.getDialect();
-  
+
   if (dialect === 'sqlite') {
     const fks = await sequelize.query(
       `PRAGMA foreign_key_list(consumable_logs);`,
@@ -411,7 +416,7 @@ async function migrateConsumableLogArchive() {
 
 async function migrateSnList() {
   const tables = ['consumables', 'consumable_records', 'consumable_logs'];
-  
+
   for (const table of tables) {
     if (await tableExists(table)) {
       const columnDef = dbDialect === 'sqlite' ? "TEXT DEFAULT '[]'" : "JSON";
@@ -429,7 +434,7 @@ async function migrateDeviceModelField() {
   }
 
   const dialect = sequelize.getDialect();
-  
+
   if (dialect === 'mysql') {
     await sequelize.query(
       'ALTER TABLE devices MODIFY COLUMN model VARCHAR(255) NULL'
@@ -441,7 +446,7 @@ async function migrateDeviceModelField() {
       console.log('    model_old 字段已存在，跳过迁移');
       return;
     }
-    
+
     await sequelize.query('ALTER TABLE devices RENAME COLUMN model TO model_old');
     await sequelize.query('ALTER TABLE devices ADD COLUMN model VARCHAR(255)');
     await sequelize.query('UPDATE devices SET model = model_old');
@@ -452,14 +457,14 @@ async function migrateDeviceModelField() {
 
 async function migrateDeviceFieldsConfig() {
   const DeviceField = require('../models/DeviceField');
-  
+
   const updates = [
     { fieldName: 'model', required: false },
     { fieldName: 'powerConsumption', required: true },
     { fieldName: 'purchaseDate', required: false },
     { fieldName: 'warrantyExpiry', required: false },
   ];
-  
+
   for (const update of updates) {
     const field = await DeviceField.findOne({ where: { fieldName: update.fieldName } });
     if (field && field.required !== update.required) {
@@ -475,7 +480,7 @@ async function migrateDeviceFieldsConfig() {
 
 async function migrateDeviceFieldsNullable() {
   const dialect = sequelize.getDialect();
-  
+
   if (dialect === 'mysql') {
     const alterCommands = [
       "ALTER TABLE devices MODIFY COLUMN name VARCHAR(255) NULL",
@@ -488,7 +493,7 @@ async function migrateDeviceFieldsNullable() {
       "ALTER TABLE devices MODIFY COLUMN powerConsumption FLOAT NULL",
       "ALTER TABLE devices MODIFY COLUMN customFields JSON NULL"
     ];
-    
+
     for (const sql of alterCommands) {
       try {
         await sequelize.query(sql);
@@ -499,21 +504,21 @@ async function migrateDeviceFieldsNullable() {
       }
     }
     console.log('    devices 表字段已改为可空');
-    
+
   } else if (dialect === 'sqlite') {
     const columns = await getTableColumns('devices');
     const hasNullableFlag = columns.includes('_nullable_migration_done');
-    
+
     if (hasNullableFlag) {
       console.log('    已完成可空迁移，跳过');
       return;
     }
-    
+
     await sequelize.query('PRAGMA foreign_keys = OFF');
-    
+
     try {
       await sequelize.query('DROP TABLE IF EXISTS devices_new');
-      
+
       await sequelize.query(`
         CREATE TABLE devices_new (
           deviceId VARCHAR(255) PRIMARY KEY NOT NULL UNIQUE,
@@ -536,28 +541,28 @@ async function migrateDeviceFieldsNullable() {
           _nullable_migration_done INTEGER DEFAULT 1
         )
       `);
-      
+
       await sequelize.query(`
         INSERT INTO devices_new (
           deviceId, name, type, model, serialNumber, rackId, position, height,
           powerConsumption, status, purchaseDate, warrantyExpiry, ipAddress,
           description, customFields, createdAt, updatedAt
         )
-        SELECT 
+        SELECT
           deviceId, name, type, model, serialNumber, rackId, position, height,
           powerConsumption, status, purchaseDate, warrantyExpiry, ipAddress,
           description, customFields, createdAt, updatedAt
         FROM devices
       `);
-      
+
       await sequelize.query('DROP TABLE devices');
       await sequelize.query('ALTER TABLE devices_new RENAME TO devices');
-      
+
       await sequelize.query('CREATE INDEX IF NOT EXISTS idx_devices_status ON devices(status)');
       await sequelize.query('CREATE INDEX IF NOT EXISTS idx_devices_type ON devices(type)');
       await sequelize.query('CREATE INDEX IF NOT EXISTS idx_devices_rackId ON devices(rackId)');
       await sequelize.query('CREATE INDEX IF NOT EXISTS idx_devices_name ON devices(name)');
-      
+
       console.log('    devices 表字段已改为可空');
     } finally {
       await sequelize.query('PRAGMA foreign_keys = ON');
@@ -630,6 +635,56 @@ async function migrateDeviceFieldsIsSystem() {
   }
 
   console.log('    设备字段系统标记迁移完成');
+}
+
+async function migrateDeviceFieldsOptions() {
+  const DeviceField = require('../models/DeviceField');
+
+  if (!(await tableExists('deviceFields'))) {
+    console.log('    deviceFields 表不存在，跳过');
+    return;
+  }
+
+  const deviceTypeOptions = [
+    { value: 'server', label: '服务器' },
+    { value: 'switch', label: '交换机' },
+    { value: 'router', label: '路由器' },
+    { value: 'storage', label: '存储设备' },
+    { value: 'other', label: '其他设备' }
+  ];
+
+  const statusOptions = [
+    { value: 'running', label: '运行中' },
+    { value: 'maintenance', label: '维护中' },
+    { value: 'offline', label: '离线' },
+    { value: 'fault', label: '故障' }
+  ];
+
+  const typeField = await DeviceField.findOne({ where: { fieldName: 'type' } });
+  if (typeField) {
+    if (!typeField.options || typeField.options.length === 0) {
+      await typeField.update({ options: deviceTypeOptions });
+      console.log('    已更新 type 字段的 options');
+    } else {
+      console.log('    type 字段 options 已存在，跳过');
+    }
+  } else {
+    console.log('    type 字段不存在，跳过');
+  }
+
+  const statusField = await DeviceField.findOne({ where: { fieldName: 'status' } });
+  if (statusField) {
+    if (!statusField.options || statusField.options.length === 0) {
+      await statusField.update({ options: statusOptions });
+      console.log('    已更新 status 字段的 options');
+    } else {
+      console.log('    status 字段 options 已存在，跳过');
+    }
+  } else {
+    console.log('    status 字段不存在，跳过');
+  }
+
+  console.log('    设备字段 Options 配置迁移完成');
 }
 
 async function migrateIdleDeviceAndBusiness() {
