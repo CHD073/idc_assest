@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { Modal, Form, Select, Checkbox, Button, message } from 'antd';
+import React, { useState } from 'react';
+import { Modal, Form, Select, Button } from 'antd';
 import { ExportOutlined } from '@ant-design/icons';
 import { designTokens } from '../../config/theme';
 
@@ -15,7 +15,6 @@ const modalHeaderStyle = {
 
 const ExportModal = ({
   visible,
-  deviceFields,
   selectedDevices,
   currentPageDevices,
   allDevices,
@@ -24,31 +23,14 @@ const ExportModal = ({
 }) => {
   const [exportFormat, setExportFormat] = useState('csv');
   const [exportScope, setExportScope] = useState('selected');
-  const [exportFields, setExportFields] = useState([]);
   const [exportLoading, setExportLoading] = useState(false);
 
-  const visibleFields = useMemo(() => {
-    return deviceFields.filter((f) => f.visible && f.fieldName !== 'rackId');
-  }, [deviceFields]);
-
-  React.useEffect(() => {
-    if (visible) {
-      setExportFields(visibleFields.map((f) => f.fieldName));
-    }
-  }, [visible, visibleFields]);
-
   const handleExport = async () => {
-    if (exportFields.length === 0) {
-      message.warning('请至少选择一个导出字段');
-      return;
-    }
-
     setExportLoading(true);
     try {
       await onExport({
         format: exportFormat,
         scope: exportScope,
-        fields: exportFields,
       });
       onCancel();
     } finally {
@@ -121,7 +103,7 @@ const ExportModal = ({
         },
         body: { padding: '24px' },
       }}
-      width={600}
+      width={500}
     >
       <Form layout="vertical">
         <Form.Item label="导出格式">
@@ -137,39 +119,8 @@ const ExportModal = ({
             <Option value="all">全部设备 ({allDevices.length} 个)</Option>
           </Select>
         </Form.Item>
-        <Form.Item label="选择导出字段">
-          <div
-            style={{
-              maxHeight: '300px',
-              overflow: 'auto',
-              border: '1px solid #f0f0f0',
-              borderRadius: '8px',
-              padding: '12px',
-            }}
-          >
-            {visibleFields.map((field) => (
-              <div key={field.fieldName} style={{ marginBottom: '8px' }}>
-                <Checkbox
-                  checked={exportFields.includes(field.fieldName)}
-                  onChange={(e) => {
-                    if (e.target.checked) {
-                      setExportFields([...exportFields, field.fieldName]);
-                    } else {
-                      setExportFields(exportFields.filter((f) => f !== field.fieldName));
-                    }
-                  }}
-                >
-                  {field.displayName}
-                </Checkbox>
-              </div>
-            ))}
-          </div>
-        </Form.Item>
         <div style={{ color: '#666', fontSize: '13px' }}>
-          已选择{' '}
-          <span style={{ color: '#1890ff', fontWeight: 600 }}>{selectedDevices.length}</span> 个设备，
-          将导出{' '}
-          <span style={{ color: '#52c41a', fontWeight: 600 }}>{exportFields.length}</span> 个字段
+          将导出设备的所有字段（包括自定义字段）
         </div>
       </Form>
     </Modal>

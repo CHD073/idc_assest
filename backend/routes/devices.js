@@ -1581,6 +1581,181 @@ router.put('/batch-move', async (req, res) => {
   }
 });
 
+// 增强导出设备数据（支持所有字段和自定义字段）
+router.get('/enhanced-export', async (req, res) => {
+  try {
+    const { deviceIds, format = 'csv' } = req.query;
+
+    // 从数据库读取所有字段配置（不过滤 visible，以导出所有信息）
+    const allFields = await DeviceField.findAll({
+      order: [['order', 'ASC']]
+    });
+
+    // 构建字段映射表
+    const fieldMap = {};
+    const fieldLabels = {};
+    allFields.forEach(field => {
+      fieldMap[field.fieldName] = field;
+      fieldLabels[field.fieldName] = field.displayName;
+    });
+
+    // 构建查询条件
+    const where = {};
+    if (deviceIds) {
+      const ids = Array.isArray(deviceIds) ? deviceIds : [deviceIds];
+      where.deviceId = { [Op.in]: ids };
+    }
+
+    // 查询设备数据
+    const devices = await Device.findAll({
+      where,
+      include: [
+        {
+          model: Rack,
+          include: [{ model: Room }]
+        }
+      ]
+    });
+
+    if (devices.length === 0) {
+      return res.status(404).json({ error: '未找到指定的设备' });
+    }
+
+    // 状态和类型映射
+    const statusMap = {
+      running: '运行中',
+      maintenance: '维护中',
+      offline: '离线',
+      fault: '故障'
+    };
+    const typeMap = {
+      server: '服务器',
+      switch: '交换机',
+      router: '路由器',
+      storage: '存储设备',
+      other: '其他设备'
+    };
+
+    // 准备导出数据 - 遍历所有设备
+    const exportData = devices.map(device => {
+      const data = {};
+
+      // 首先处理关联字段（机房）- 如果 DeviceField 中没有配置 roomName，也导出机房信息
+      const hasRoomField = allFields.some(f => f.fieldName === 'roomName');
+      if (!hasRoomField) {
+        data['所在机房'] = device.Rack?.Room?.name || '';
+      }
+
+      // 遍历所有字段配置动态获取值
+      allFields.forEach(field => {
+        const fieldName = field.fieldName;
+        const label = field.displayName;
+
+        // 首先检查 device 表的直字段
+        if (device[fieldName] !== undefined && device[fieldName] !== null) {
+          if (fieldName === 'rackId') {
+            data[label] = device.Rack?.name || '';
+          } else if (fieldName === 'roomName') {
+            data[label] = device.Rack?.Room?.name || '';
+          } else if (fieldName === 'status') {
+            data[label] = statusMap[device.status] || device.status || '';
+          } else if (fieldName === 'type') {
+            data[label] = typeMap[device.type] || device.type || '';
+          } else if (fieldName === 'purchaseDate' || fieldName === 'warrantyExpiry') {
+            data[label] = device[fieldName] ? new Date(device[fieldName]).toLocaleDateString('zh-CN') : '';
+          } else {
+            data[label] = device[fieldName];
+          }
+        } else if (device.customFields && typeof device.customFields === 'object' && device.customFields[fieldName] !== undefined) {
+          data[label] = device.customFields[fieldName];
+        } else {
+          // 设备表中没有该字段且 customFields 中也没有，设为空字符串
+          data[label] = '';
+        }
+      });
+
+      // 展开 customFields 中额外的自定义字段（不在 DeviceField 配置中的）
+      if (device.customFields && typeof device.customFields === 'object') {
+        Object.entries(device.customFields).forEach(([key, value]) => {
+          if (!fieldMap[key]) {
+            data[key] = value;
+          }
+        });
+      }
+
+      return data;
+    });
+
+    // CSV 导出
+    if (format === 'csv') {
+      // 构建完整的 header 列表（基于所有字段配置 + customFields 中的额外字段）
+      const headerSet = new Set();
+
+      // 添加机房字段（如果存在）
+      const hasRoomField = allFields.some(f => f.fieldName === 'roomName');
+      if (!hasRoomField) {
+        headerSet.add('所在机房');
+      }
+
+      // 添加所有 DeviceField 配置的字段
+      allFields.forEach(field => {
+        headerSet.add(field.displayName);
+      });
+
+      // 收集所有设备 customFields 中的额外字段键
+      devices.forEach(device => {
+        if (device.customFields && typeof device.customFields === 'object') {
+          Object.keys(device.customFields).forEach(key => {
+            if (!fieldMap[key]) {
+              headerSet.add(key);
+            }
+          });
+        }
+      });
+
+      const headers = Array.from(headerSet).map(key => ({ id: key, title: key }));
+
+      if (headers.length === 0) {
+        return res.status(400).json({ error: '没有可导出的字段' });
+      }
+
+      const csvWriter = createObjectCsvWriter({
+        path: path.join(__dirname, '../temp/enhanced_export.csv'),
+        header: headers,
+        encoding: 'utf8'
+      });
+
+      if (!fs.existsSync(path.join(__dirname, '../temp'))) {
+        fs.mkdirSync(path.join(__dirname, '../temp'));
+      }
+
+      await csvWriter.writeRecords(exportData);
+
+      const csvContent = fs.readFileSync(path.join(__dirname, '../temp/enhanced_export.csv'), 'utf8');
+      const gbkContent = iconv.encode(csvContent, 'gbk');
+
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename=devices.csv');
+      res.send(gbkContent);
+
+      fs.unlinkSync(path.join(__dirname, '../temp/enhanced_export.csv'));
+    } else {
+      // JSON 导出
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', 'attachment; filename=devices.json');
+      res.json({
+        exportTime: new Date().toISOString(),
+        totalCount: devices.length,
+        fields: Object.values(fieldLabels),
+        devices: exportData
+      });
+    }
+  } catch (error) {
+    console.error('增强导出失败:', error);
+    res.status(500).json({ error: '增强导出失败' });
+  }
+});
+
 // 获取单个设备
 router.get('/:deviceId', async (req, res) => {
   try {
@@ -2041,136 +2216,6 @@ router.delete('/:deviceId', async (req, res) => {
     await t.rollback();
     console.error('删除设备失败:', error);
     res.status(500).json({ error: error.message });
-  }
-});
-
-// 增强导出设备数据（支持自定义字段）
-router.get('/enhanced-export', async (req, res) => {
-  try {
-    const { deviceIds, format = 'csv', fields, fieldLabels } = req.query;
-    
-    // 解析字段列表
-    let selectedFields = [];
-    try {
-      selectedFields = fields ? JSON.parse(fields) : [];
-    } catch (e) {
-      selectedFields = [];
-    }
-    
-    // 解析字段标签
-    let fieldLabelMap = {};
-    try {
-      fieldLabelMap = fieldLabels ? JSON.parse(fieldLabels) : {};
-    } catch (e) {
-      fieldLabelMap = {};
-    }
-    
-    // 构建查询条件
-    const where = {};
-    if (deviceIds) {
-      const ids = Array.isArray(deviceIds) ? deviceIds : [deviceIds];
-      where.deviceId = { [Op.in]: ids };
-    }
-    
-    // 查询设备数据
-    const devices = await Device.findAll({
-      where,
-      include: [
-        {
-          model: Rack,
-          include: [
-            { model: Room }
-          ]
-        }
-      ]
-    });
-    
-    if (devices.length === 0) {
-      return res.status(404).json({ error: '未找到指定的设备' });
-    }
-    
-    // 准备导出数据
-    const exportData = devices.map(device => {
-      const data = {};
-      
-      selectedFields.forEach(fieldName => {
-        // 映射字段名到中文标签
-        const label = fieldLabelMap[fieldName] || fieldName;
-        
-        // 根据字段名获取值
-        if (fieldName === 'rackName') {
-          data[label] = device.Rack?.name || '';
-        } else if (fieldName === 'roomName') {
-          data[label] = device.Rack?.Room?.name || '';
-        } else if (fieldName === 'status') {
-          const statusMap = {
-            running: '运行中',
-            maintenance: '维护中',
-            offline: '离线',
-            fault: '故障'
-          };
-          data[label] = statusMap[device.status] || device.status;
-        } else if (fieldName === 'type') {
-          const typeMap = {
-            server: '服务器',
-            switch: '交换机',
-            router: '路由器',
-            storage: '存储设备',
-            other: '其他设备'
-          };
-          data[label] = typeMap[device.type] || device.type;
-        } else if (fieldName === 'purchaseDate' || fieldName === 'warrantyExpiry') {
-          data[label] = device[fieldName] ? new Date(device[fieldName]).toLocaleDateString('zh-CN') : '';
-        } else if (fieldName === 'customFields' && device.customFields) {
-          // 如果选择导出自定义字段，展开为单独的列
-          Object.entries(device.customFields).forEach(([key, value]) => {
-            data[key] = value;
-          });
-        } else if (device[fieldName] !== undefined) {
-          data[label] = device[fieldName];
-        }
-      });
-      
-      return data;
-    });
-    
-    if (format === 'json') {
-      // JSON格式导出
-      res.setHeader('Content-Type', 'application/json');
-      res.setHeader('Content-Disposition', 'attachment; filename=devices.json');
-      res.json({
-        exportTime: new Date().toISOString(),
-        totalCount: devices.length,
-        devices: exportData
-      });
-    } else {
-      // CSV格式导出
-      const csvWriter = createObjectCsvWriter({
-        path: path.join(__dirname, '../temp/enhanced_export.csv'),
-        header: Object.keys(exportData[0] || {}).map(key => ({ id: key, title: key })),
-        encoding: 'utf8'
-      });
-      
-      // 确保temp目录存在
-      if (!fs.existsSync(path.join(__dirname, '../temp'))) {
-        fs.mkdirSync(path.join(__dirname, '../temp'));
-      }
-      
-      await csvWriter.writeRecords(exportData);
-      
-      const csvContent = fs.readFileSync(path.join(__dirname, '../temp/enhanced_export.csv'), 'utf8');
-      const gbkContent = iconv.encode(csvContent, 'gbk');
-      
-      res.setHeader('Content-Type', 'text/csv');
-      res.setHeader('Content-Disposition', 'attachment; filename=devices.csv');
-      
-      res.send(gbkContent);
-      
-      fs.unlinkSync(path.join(__dirname, '../temp/enhanced_export.csv'));
-    }
-  } catch (error) {
-    console.error('增强导出失败:', error);
-    res.status(500).json({ error: '增强导出失败' });
   }
 });
 

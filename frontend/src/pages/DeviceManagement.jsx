@@ -478,12 +478,7 @@ function DeviceManagement() {
     setExportModalVisible(true);
   };
 
-  const handleEnhancedExport = async ({ format, scope, fields }) => {
-    const fieldLabels = {};
-    deviceFields.forEach((field) => {
-      fieldLabels[field.fieldName] = field.displayName;
-    });
-
+  const handleEnhancedExport = async ({ format, scope }) => {
     let deviceIds = [];
     if (scope === 'selected') {
       deviceIds = selectedDevices;
@@ -501,8 +496,6 @@ function DeviceManagement() {
     const params = new URLSearchParams();
     deviceIds.forEach((id) => params.append('deviceIds', id));
     params.append('format', format);
-    params.append('fields', JSON.stringify(fields));
-    params.append('fieldLabels', JSON.stringify(fieldLabels));
 
     const response = await axios.get(`/api/devices/enhanced-export?${params.toString()}`, {
       responseType: 'blob',
@@ -1221,7 +1214,6 @@ function DeviceManagement() {
 
       <ExportModal
         visible={exportModalVisible}
-        deviceFields={deviceFields}
         selectedDevices={selectedDevices}
         currentPageDevices={currentPageDevices}
         allDevices={allDevices}
